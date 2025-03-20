@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, TouchableOpacity, SafeAreaView } from 'react-na
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import SearchPage from './components/search';
 import HomePage from './components/home';
+import SettingsPage from './components/settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
@@ -15,9 +16,7 @@ export default function App() {
         return <SearchPage />; 
       case 'Settings':
         return (
-          <View style={styles.settingsContainer}>
-            <Text style={styles.settingsText}>Settings Page</Text>
-          </View>
+          <SettingsPage/>
         ); //placeholder 
       default:
         return <HomePage setActiveTab={setActiveTab} />;
