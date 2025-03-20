@@ -2,7 +2,11 @@ import React, {useState} from 'react';
 import { View, Text, StyleSheet, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function SettingsPage()
+interface SettingsPageProps {
+  onSignOut: () => void;
+}
+
+export default function SettingsPage({ onSignOut }: SettingsPageProps)
 {
 
     const [stickyRepeat, setStickyRepeat] = useState(false);

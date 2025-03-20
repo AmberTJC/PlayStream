@@ -2,6 +2,10 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+interface HomePageProps {
+  setActiveTab: (tab: string) => void;
+}
+
 const playlists = [
   { name: 'Favourites', image: require('../assets/home-images/favs.jpg') },
   { name: 'Chill Vibes', image: require('../assets/home-images/chill vibes.png') },
@@ -11,7 +15,7 @@ const playlists = [
   { name: 'Country Vibes', image: require('../assets/home-images/country vibes.jpg') },
 ];
 
-export default function HomePage() {
+export default function HomePage({ setActiveTab }: HomePageProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
