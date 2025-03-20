@@ -14,20 +14,22 @@ export default function SettingsPage({ onSignOut }: SettingsPageProps)
                     <Text style={styles.headerText}>PlayStream</Text>
                   </View>
             <View>
-                <Ionicons name = "person-circle-outline" size={40} color="#0D9488"></Ionicons>
+                <Ionicons style ={styles.icons} name = "person-circle-outline" size={40} color="#0D9488"></Ionicons>
                 <Text style = {styles.sectionTitle}>Account Settings</Text>
                 <Text style = {styles.subText}>Manage Account</Text>
             </View>
             <View>
-                <Ionicons name = "repeat-outline" size={40} color="#0D9488"></Ionicons>
+                <Ionicons style ={styles.icons} name = "repeat-outline" size={40} color="#0D9488"></Ionicons>
                 <Text style = {styles.sectionTitle}>Sticky Repeat</Text>
                 <Text style = {styles.subText}>Repeat persists between song selections</Text>
             </View>
             <View>
+            <Ionicons style ={styles.icons} name = "sync-outline" size={40} color="#0D9488"></Ionicons>
                 <Text style = {styles.sectionTitle}>Gapless Playback</Text>
                 <Text style = {styles.subText}>Plays without pausing between songs</Text>
             </View>
             <View>
+            <Ionicons style ={styles.icons} name = "toggle-outline" size={40} color="#0D9488"></Ionicons>
                 <Text style = {styles.sectionTitle}>Display</Text>
                 <Text style = {styles.subText}>Toggles between dark and light mode</Text>
             </View>
@@ -65,6 +67,10 @@ const styles = StyleSheet.create({
       subText: {
         color: '#0D9488',
         fontSize: 14,
-        marginBottom: 12,
+        marginBottom: 40,
+      },
+      icons: {
+        marginTop: 15,
+        
       },
 });
