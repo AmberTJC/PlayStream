@@ -71,7 +71,7 @@ export default function SearchPage() {
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="home" size={24} color="#0D9488" />
@@ -85,7 +85,7 @@ export default function SearchPage() {
           <Ionicons name="settings" size={24} color="#0D9488" />
           <Text style={styles.navText}>Settings</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </View>
   );
 }
