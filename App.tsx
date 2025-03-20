@@ -4,20 +4,41 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import SearchPage from './components/search';
 import HomePage from './components/home';
 import SettingsPage from './components/settings';
+import SignIn from './components/signin';
+import SignUpPage from './components/signup';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
+
+  const handleSignIn = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleSignOut = () => {
+    setIsAuthenticated(false);
+  };
+
+  const handleSignUp = () => {
+    setIsAuthenticated(true);
+  };
 
   const renderContent = () => {
+    if (!isAuthenticated) {
+      if (showSignUp) {
+        return <SignUpPage onSignUp={handleSignUp} onBackToLogin={() => setShowSignUp(false)} />;
+      }
+      return <SignIn onSignIn={handleSignIn} onNavigateToSignUp={() => setShowSignUp(true)} />;
+    }
+
     switch (activeTab) {
       case 'Home':
         return <HomePage setActiveTab={setActiveTab} />;
       case 'Search':
-        return <SearchPage />; 
+        return <SearchPage />;
       case 'Settings':
-        return (
-          <SettingsPage/>
-        ); //placeholder 
+        return <SettingsPage onSignOut={handleSignOut} />;
       default:
         return <HomePage setActiveTab={setActiveTab} />;
     }
@@ -30,30 +51,32 @@ export default function App() {
         {renderContent()}
       </View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('Home')} 
-        >
-          <Ionicons name="home" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('Search')}
-        >
-          <Ionicons name="search" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('Settings')}
-        >
-          <Ionicons name="settings" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Bottom Navigation - Only show when authenticated */}
+      {isAuthenticated && (
+        <View style={styles.bottomNav}>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => setActiveTab('Home')}
+          >
+            <Ionicons name="home" size={24} color="#0D9488" />
+            <Text style={styles.navText}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => setActiveTab('Search')}
+          >
+            <Ionicons name="search" size={24} color="#0D9488" />
+            <Text style={styles.navText}>Search</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => setActiveTab('Settings')}
+          >
+            <Ionicons name="settings" size={24} color="#0D9488" />
+            <Text style={styles.navText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

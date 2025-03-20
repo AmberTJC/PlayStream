@@ -70,22 +70,6 @@ export default function SearchPage() {
           ))}
         </View>
       </ScrollView>
-
-      {/* Bottom Navigation
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="search" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="settings" size={24} color="#0D9488" />
-          <Text style={styles.navText}>Settings</Text>
-        </TouchableOpacity>
-      </View> */}
     </View>
   );
 }

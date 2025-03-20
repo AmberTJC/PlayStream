@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function SettingsPage()
+interface SettingsPageProps {
+  onSignOut: () => void;
+}
+
+export default function SettingsPage({ onSignOut }: SettingsPageProps)
 {
     return(
         <View style={styles.container}>
