@@ -1,15 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, SafeAreaView, Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../lib/supabaseClient';
 
 interface SignInProps {
-  onSignIn: (email: string, password: string) => void;
+  onSignIn: (email: string, password: string) => Promise<void>;
   onNavigateToSignUp: () => void;
+  onSuccessfulSignIn: () => void;
 }
 
-export default function SignIn({ onSignIn, onNavigateToSignUp }: SignInProps) {
+
+export default function SignIn({ onNavigateToSignUp, onSuccessfulSignIn }: SignInProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const handleSignIn = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error(error);
+        Alert.alert('Error', 'Invalid email or password. Please try again.');
+        return;
+      }
+
+      if (data.session) {
+        Alert.alert('Success', 'Logged in successfully!');
+        onSuccessfulSignIn();
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -46,17 +72,11 @@ export default function SignIn({ onSignIn, onNavigateToSignUp }: SignInProps) {
           />
         </View>
 
-        <TouchableOpacity 
-          style={styles.signInButton}
-          onPress={() => onSignIn(email, password)}
-        >
+        <TouchableOpacity style={styles.signInButton} onPress={handleSignIn}>
           <Text style={styles.signInButtonText}>Sign In</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.signUpButton}
-          onPress={onNavigateToSignUp}
-        >
+        <TouchableOpacity style={styles.signUpButton} onPress={onNavigateToSignUp}>
           <Text style={styles.signUpButtonText}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
       </View>
@@ -83,20 +103,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'center',
-    
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 10,
-    marginLeft: 100,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     marginBottom: 32,
-    marginLeft: 125
+    textAlign: 'center',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -135,4 +154,4 @@ const styles = StyleSheet.create({
     color: '#0D9488',
     fontSize: 14,
   },
-}); 
+});
