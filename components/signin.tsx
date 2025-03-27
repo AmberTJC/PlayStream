@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createClient } from '@supabase/supabase-js';
 
 interface SignInProps {
   onSignIn: (email: string, password: string) => void;
   onNavigateToSignUp: () => void;
 }
 
+// Initialize Supabase client
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export default function SignIn({ onSignIn, onNavigateToSignUp }: SignInProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const handleEmailSignIn = async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Error signing in:', error.message);
+    } else {
+      const user = data.user; // Access user from data
+      console.log('User signed in:', user);
+      // Navigate to landing page or handle user state
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,7 +69,7 @@ export default function SignIn({ onSignIn, onNavigateToSignUp }: SignInProps) {
 
         <TouchableOpacity 
           style={styles.signInButton}
-          onPress={() => onSignIn(email, password)}
+          onPress={handleEmailSignIn}
         >
           <Text style={styles.signInButtonText}>Sign In</Text>
         </TouchableOpacity>
@@ -83,7 +104,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'center',
-    
   },
   title: {
     fontSize: 28,
@@ -96,7 +116,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 32,
-    marginLeft: 125
+    marginLeft: 125,
   },
   inputContainer: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createClient } from '@supabase/supabase-js';
 
 interface SignUpPageProps {
   onSignUp: () => void;
@@ -12,9 +13,42 @@ export default function SignUpPage({ onSignUp, onBackToLogin }: SignUpPageProps)
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
-  const handleSignUp = () => {
-    onSignUp();
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+  const handleSignUp = async () => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Error signing up:', error.message);
+    } else {
+      const user = data.user;
+
+      if (user) {
+        // Store user details in the user_details table
+        const { data: insertData, error: insertError } = await supabase
+          .from('user_details')
+          .insert([
+            { uuid: user.id, first_name: firstName, last_name: lastName, email: user.email },
+          ]);
+
+        if (insertError) {
+          console.error('Error inserting user details:', insertError.message);
+        } else {
+          console.log('User details stored:', insertData);
+          // Navigate to landing page
+        }
+      } else {
+        console.error('User object is null after sign up.');
+      }
+    }
   };
 
   return (
