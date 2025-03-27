@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, SafeAreaView, Alert} from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
 
 interface SignUpProps {
-  onSignUp: (email: string, password: string) => Promise<void>;
   onNavigateToSignIn: () => void; 
-  onSuccessfulSignUp: () => void; 
+  onSignUp: (email: string, password: string) => void;
+  onSuccessfulSignUp: () => void;
 }
 
-
 export default function SignUp({ onNavigateToSignIn }: SignUpProps) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSignUp = async () => {
+    if (!firstName || !lastName || !email || !password) {
+      Alert.alert('Error', 'All fields are required');
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -28,8 +34,24 @@ export default function SignUp({ onNavigateToSignIn }: SignUpProps) {
       }
 
       if (data.user) {
-        Alert.alert('Success', 'Account created successfully! Please sign in.');
-        onNavigateToSignIn();
+        const { error: insertError } = await supabase
+          .from('user_details')
+          .insert([
+            {
+              first_name: firstName,
+              last_name: lastName,
+              email,
+              uuid: data.user.id,
+            },
+          ]);
+
+        if (insertError) {
+          console.error(insertError);
+          Alert.alert('Error', 'Failed to save user details.');
+        } else {
+          Alert.alert('Success', 'Account created successfully! Please sign in.');
+          onNavigateToSignIn();
+        }
       }
     } catch (err) {
       console.error(err);
@@ -46,6 +68,28 @@ export default function SignUp({ onNavigateToSignIn }: SignUpProps) {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Sign up to get started</Text>
+
+        <View style={styles.inputContainer}>
+          <Ionicons name="person-outline" size={20} color="#0D9488" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="First Name"
+            placeholderTextColor="#666"
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Ionicons name="person-outline" size={20} color="#0D9488" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Last Name"
+            placeholderTextColor="#666"
+            value={lastName}
+            onChangeText={setLastName}
+          />
+        </View>
 
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={20} color="#0D9488" style={styles.inputIcon} />
@@ -155,3 +199,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
