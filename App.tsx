@@ -6,6 +6,10 @@ import HomePage from './components/home';
 import SettingsPage from './components/settings';
 import SignIn from './components/signin';
 import SignUpPage from './components/signup';
+import * as eva from '@eva-design/eva';
+import { ApplicationProvider, Layout} from '@ui-kitten/components';
+import { default as theme } from './themes/dark-theme.json';
+
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
@@ -45,6 +49,7 @@ export default function App() {
   };
 
   return (
+    <ApplicationProvider {...eva} theme={{ ...eva.dark, ...theme }}>
     <SafeAreaView style={{ flex: 1 }}>
       {/* Render content based on active tab */}
       <View style={{ flex: 1 }}>
@@ -78,6 +83,7 @@ export default function App() {
         </View>
       )}
     </SafeAreaView>
+    </ApplicationProvider>
   );
 }
 
