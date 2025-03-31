@@ -1,24 +1,45 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Button } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createClient, User } from '@supabase/supabase-js';
 
-interface LandingProps {
-  onSignOut: () => void;
-}
+const supabaseUrl = 'YOUR_SUPABASE_URL';
+const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function Landing({ onSignOut }: LandingProps) {
+export default function LandingPage() {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const session = supabase.auth.getSession();
+    session.then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // Navigate to sign-in page
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>PlayStream</Text>
-        <TouchableOpacity onPress={onSignOut} style={styles.signOutButton}>
+        <TouchableOpacity onPress={handleLogout} style={styles.signOutButton}>
           <Ionicons name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.welcomeText}>Welcome to PlayStream</Text>
-        <Text style={styles.subtitle}>Your music journey begins here</Text>
+        {user ? (
+          <>
+            <Text style={styles.welcomeText}>Welcome, {user.email}</Text>
+            <Text style={styles.subtitle}>Your music journey begins here</Text>
+          </>
+        ) : (
+          <Text style={styles.welcomeText}>Please sign in</Text>
+        )}
 
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
