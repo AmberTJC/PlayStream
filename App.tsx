@@ -6,34 +6,91 @@ import HomePage from './components/home';
 import SettingsPage from './components/settings';
 import SignIn from './components/signin';
 import SignUpPage from './components/signup';
+import { supabase } from './lib/supabaseClient';
 import * as eva from '@eva-design/eva';
 import { ApplicationProvider, Layout} from '@ui-kitten/components';
 import { default as theme } from './themes/dark-theme.json';
-
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
 
-  const handleSignIn = () => {
-    setIsAuthenticated(true);
+  const handleSignIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.log('Sign In Error:', error.message);
+      } else {
+        console.log('Sign In Successful:', data);
+        setIsAuthenticated(true); 
+      }
+    } catch (error) {
+      console.error('Error signing in:', error);
+    }
   };
 
   const handleSignOut = () => {
-    setIsAuthenticated(false);
+    setIsAuthenticated(false); 
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.log('Sign Up Error:', error.message);
+      } else {
+        console.log('Sign Up Successful:', data);
+      }
+    } catch (error) {
+      console.error('Error signing up:', error);
+    }
+  };
+
+  const handleNavigateToSignIn = () => {
+    setShowSignUp(false); 
+  };
+
+
+  const handleNavigateToSignUp = () => {
+    setShowSignUp(true); 
+  };
+
+  const handleSuccessfulSignIn = () => {
     setIsAuthenticated(true);
+  };
+
+  const handleSuccessfulSignUp = () => {
+    setIsAuthenticated(true); 
   };
 
   const renderContent = () => {
     if (!isAuthenticated) {
       if (showSignUp) {
-        return <SignUpPage onSignUp={handleSignUp} onBackToLogin={() => setShowSignUp(false)} />;
+        return (
+          <SignUpPage
+            onSignUp={handleSignUp}
+            onNavigateToSignIn={handleNavigateToSignIn}
+            onSuccessfulSignUp={handleSuccessfulSignUp}
+          />
+        );
       }
-      return <SignIn onSignIn={handleSignIn} onNavigateToSignUp={() => setShowSignUp(true)} />;
+
+      return (
+        <SignIn
+          onSignIn={handleSignIn}
+          onNavigateToSignUp={handleNavigateToSignUp}
+          onSuccessfulSignIn={handleSuccessfulSignIn}
+        />
+      );
     }
 
     switch (activeTab) {
@@ -51,32 +108,21 @@ export default function App() {
   return (
     <ApplicationProvider {...eva} theme={{ ...eva.dark, ...theme }}>
     <SafeAreaView style={{ flex: 1 }}>
-      {/* Render content based on active tab */}
       <View style={{ flex: 1 }}>
         {renderContent()}
       </View>
 
-      {/* Bottom Navigation - Only show when authenticated */}
       {isAuthenticated && (
         <View style={styles.bottomNav}>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => setActiveTab('Home')}
-          >
+          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Home')}>
             <Ionicons name="home" size={24} color="#0D9488" />
             <Text style={styles.navText}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => setActiveTab('Search')}
-          >
+          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Search')}>
             <Ionicons name="search" size={24} color="#0D9488" />
             <Text style={styles.navText}>Search</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => setActiveTab('Settings')}
-          >
+          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Settings')}>
             <Ionicons name="settings" size={24} color="#0D9488" />
             <Text style={styles.navText}>Settings</Text>
           </TouchableOpacity>
@@ -101,15 +147,6 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 12,
     color: '#0D9488',
-  },
-  settingsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settingsText: {
-    fontSize: 24,
-    color: '#fff',
   },
 });
 
