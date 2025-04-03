@@ -6,10 +6,43 @@ import HomePage from './components/home';
 import SettingsPage from './components/settings';
 import SignIn from './components/signin';
 import SignUpPage from './components/signup';
+import CategoryScreen from './components/CategoryScreen';
 import { supabase } from './lib/supabaseClient';
 import * as eva from '@eva-design/eva';
-import { ApplicationProvider, Layout} from '@ui-kitten/components';
-import { default as theme } from './themes/dark-theme.json';
+import { ApplicationProvider } from '@ui-kitten/components';
+import theme from './themes/dark-theme.json';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+const Stack = createStackNavigator();
+
+function AuthenticatedScreens({ activeTab, setActiveTab, onSignOut }: {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <Stack.Navigator
+      initialRouteName="Home"
+      screenOptions={{ headerShown: false }}  // Disable the default header
+    >
+      {activeTab === 'Home' && (
+        <Stack.Screen name="Home">
+          {() => <HomePage setActiveTab={setActiveTab} />}
+        </Stack.Screen>
+      )}
+      {activeTab === 'Search' && (
+        <Stack.Screen name="Search" component={SearchPage} />
+      )}
+      {activeTab === 'Settings' && (
+        <Stack.Screen name="Settings">
+          {() => <SettingsPage onSignOut={onSignOut} />}
+        </Stack.Screen>
+      )}
+      <Stack.Screen name="Category" component={CategoryScreen} />
+    </Stack.Navigator>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
@@ -27,7 +60,7 @@ export default function App() {
         console.log('Sign In Error:', error.message);
       } else {
         console.log('Sign In Successful:', data);
-        setIsAuthenticated(true); 
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error('Error signing in:', error);
@@ -35,7 +68,7 @@ export default function App() {
   };
 
   const handleSignOut = () => {
-    setIsAuthenticated(false); 
+    setIsAuthenticated(false);
   };
 
   const handleSignUp = async (email: string, password: string) => {
@@ -55,80 +88,53 @@ export default function App() {
     }
   };
 
-  const handleNavigateToSignIn = () => {
-    setShowSignUp(false); 
-  };
-
-
-  const handleNavigateToSignUp = () => {
-    setShowSignUp(true); 
-  };
-
-  const handleSuccessfulSignIn = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleSuccessfulSignUp = () => {
-    setIsAuthenticated(true); 
-  };
-
   const renderContent = () => {
     if (!isAuthenticated) {
       if (showSignUp) {
         return (
           <SignUpPage
             onSignUp={handleSignUp}
-            onNavigateToSignIn={handleNavigateToSignIn}
-            onSuccessfulSignUp={handleSuccessfulSignUp}
+            onNavigateToSignIn={() => setShowSignUp(false)}
+            onSuccessfulSignUp={() => setIsAuthenticated(true)}
           />
         );
       }
-
       return (
         <SignIn
           onSignIn={handleSignIn}
-          onNavigateToSignUp={handleNavigateToSignUp}
-          onSuccessfulSignIn={handleSuccessfulSignIn}
+          onNavigateToSignUp={() => setShowSignUp(true)}
+          onSuccessfulSignIn={() => setIsAuthenticated(true)}
         />
       );
     }
-
-    switch (activeTab) {
-      case 'Home':
-        return <HomePage setActiveTab={setActiveTab} />;
-      case 'Search':
-        return <SearchPage />;
-      case 'Settings':
-        return <SettingsPage onSignOut={handleSignOut} />;
-      default:
-        return <HomePage setActiveTab={setActiveTab} />;
-    }
+    return (
+      <NavigationContainer>
+        <AuthenticatedScreens activeTab={activeTab} setActiveTab={setActiveTab} onSignOut={handleSignOut} />
+      </NavigationContainer>
+    );
   };
 
   return (
     <ApplicationProvider {...eva} theme={{ ...eva.dark, ...theme }}>
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={{ flex: 1 }}>
-        {renderContent()}
-      </View>
-
-      {isAuthenticated && (
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Home')}>
-            <Ionicons name="home" size={24} color="#0D9488" />
-            <Text style={styles.navText}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Search')}>
-            <Ionicons name="search" size={24} color="#0D9488" />
-            <Text style={styles.navText}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Settings')}>
-            <Ionicons name="settings" size={24} color="#0D9488" />
-            <Text style={styles.navText}>Settings</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </SafeAreaView>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>{renderContent()}</View>
+        {isAuthenticated && (
+          <View style={styles.bottomNav}>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Home')}>
+              <Ionicons name="home" size={24} color="#0D9488" />
+              <Text style={styles.navText}>Home</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Search')}>
+              <Ionicons name="search" size={24} color="#0D9488" />
+              <Text style={styles.navText}>Search</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Settings')}>
+              <Ionicons name="settings" size={24} color="#0D9488" />
+              <Text style={styles.navText}>Settings</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </SafeAreaView>
     </ApplicationProvider>
   );
 }
