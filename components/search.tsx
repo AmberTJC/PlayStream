@@ -39,39 +39,39 @@ type RootStackParamList = {
 
 export default function SearchPage() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const [searchQuery, setSearchQuery] = useState('');
   // State to manage sound objects keyed by trending index
   const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
   // Manage the UI overlay status for each trending image
   const [audioStatus, setAudioStatus] = useState<{ [key: number]: 'hidden' | 'play' | 'stop' }>({});
 
   const handleAudioToggle = async (index: number) => {
-    // Ensure only one audio plays at a time
+    // Stop any other playing audio
     for (const key in soundObjects) {
       const keyNum = parseInt(key);
       if (keyNum !== index && audioStatus[keyNum] === 'play') {
         try {
           await soundObjects[keyNum].stopAsync();
           await soundObjects[keyNum].unloadAsync();
-          setSoundObjects(prev => {
+          setSoundObjects((prev) => {
             const newState = { ...prev };
             delete newState[keyNum];
             return newState;
           });
-          setAudioStatus(prev => ({ ...prev, [keyNum]: 'hidden' }));
+          setAudioStatus((prev) => ({ ...prev, [keyNum]: 'hidden' }));
         } catch (error) {
           console.error(`Error stopping sound at index ${keyNum}:`, error);
         }
       }
     }
-
     const currentStatus = audioStatus[index] || 'hidden';
 
     if (currentStatus === 'hidden' || currentStatus === 'stop') {
       try {
         const { sound } = await Audio.Sound.createAsync(trendingMusics[index]);
         await sound.playAsync();
-        setSoundObjects(prev => ({ ...prev, [index]: sound }));
-        setAudioStatus(prev => ({ ...prev, [index]: 'play' }));
+        setSoundObjects((prev) => ({ ...prev, [index]: sound }));
+        setAudioStatus((prev) => ({ ...prev, [index]: 'play' }));
       } catch (error) {
         console.error('Error playing sound:', error);
       }
@@ -81,18 +81,22 @@ export default function SearchPage() {
         if (sound) {
           await sound.stopAsync();
           await sound.unloadAsync();
-          setSoundObjects(prev => {
+          setSoundObjects((prev) => {
             const newState = { ...prev };
             delete newState[index];
             return newState;
           });
         }
-        setAudioStatus(prev => ({ ...prev, [index]: 'hidden' }));
+        setAudioStatus((prev) => ({ ...prev, [index]: 'hidden' }));
       } catch (error) {
         console.error('Error stopping sound:', error);
       }
     }
   };
+
+  const filteredCategories = categories.filter((cat) =>
+    cat.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -103,49 +107,80 @@ export default function SearchPage() {
           style={styles.searchInput}
           placeholder="Search for music..."
           placeholderTextColor="#ccc"
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
         />
       </View>
 
-      {/* Trending Section */}
-      <Text style={styles.sectionTitle}>Trending Now</Text>
-      <View style={styles.trendingGrid}>
-        {trendingImages.map((image, index) => {
-          const status = audioStatus[index] || 'hidden';
-          return (
-            <TouchableOpacity
-              key={index}
-              style={styles.trendingItem}
-              onPress={() => handleAudioToggle(index)}
-            >
-              <Image source={image} style={styles.trendingImage} />
-              {status !== 'hidden' && (
-                <View style={styles.overlayIcon}>
-                  {status === 'play' ? (
-                    <Ionicons name="play-circle" size={32} color="#FF9800" />
-                  ) : (
-                    <Ionicons name="stop-circle" size={32} color="#F44336" />
+      {searchQuery.trim() !== '' ? (
+        // If the user types something, show search results (filtered categories)
+        <View style={styles.searchResults}>
+          <Text style={styles.sectionTitle}>Search Results</Text>
+          <View style={styles.resultsGrid}>
+            {filteredCategories.length > 0 ? (
+              filteredCategories.map((cat) => {
+                // Get the index from the full categories array to fetch corresponding image
+                const imgIndex = categories.indexOf(cat);
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={styles.categoryItem}
+                    onPress={() => navigation.navigate('Category', { category: cat })}
+                  >
+                    <Image source={categoryImages[imgIndex]} style={styles.categoryImage} />
+                    <Text style={styles.categoryText}>{cat}</Text>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <Text style={styles.noResults}>No matching categories found.</Text>
+            )}
+          </View>
+        </View>
+      ) : (
+        <>
+          {/* Trending Section */}
+          <Text style={styles.sectionTitle}>Trending Now</Text>
+          <View style={styles.trendingGrid}>
+            {trendingImages.map((image, index) => {
+              const status = audioStatus[index] || 'hidden';
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.trendingItem}
+                  onPress={() => handleAudioToggle(index)}
+                >
+                  <Image source={image} style={styles.trendingImage} />
+                  {status !== 'hidden' && (
+                    <View style={styles.overlayIcon}>
+                      {status === 'play' ? (
+                        <Ionicons name="play-circle" size={32} color="#FF9800" />
+                      ) : (
+                        <Ionicons name="stop-circle" size={32} color="#F44336" />
+                      )}
+                    </View>
                   )}
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-      {/* Categories Section */}
-      <Text style={styles.sectionTitle}>All Categories</Text>
-      <View style={styles.categoriesGrid}>
-        {categories.map((category, index) => (
-          <TouchableOpacity
-            key={category}
-            style={styles.categoryItem}
-            onPress={() => navigation.navigate('Category', { category })}
-          >
-            <Image source={categoryImages[index]} style={styles.categoryImage} />
-            <Text style={styles.categoryText}>{category}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          {/* Categories Section */}
+          <Text style={styles.sectionTitle}>All Categories</Text>
+          <View style={styles.categoriesGrid}>
+            {categories.map((category, index) => (
+              <TouchableOpacity
+                key={category}
+                style={styles.categoryItem}
+                onPress={() => navigation.navigate('Category', { category })}
+              >
+                <Image source={categoryImages[index]} style={styles.categoryImage} />
+                <Text style={styles.categoryText}>{category}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -177,7 +212,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FF9800',
+    color: '#0D9488',
     marginVertical: 10,
   },
   trendingGrid: {
@@ -228,5 +263,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+  },
+  searchResults: {
+    marginBottom: 30,
+  },
+  resultsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  noResults: {
+    color: '#fff',
+    fontStyle: 'italic',
   },
 });
