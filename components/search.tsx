@@ -1,16 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
+  SafeAreaView,
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  Animated,
   ScrollView,
   Image,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+
+const deviceWidth = Dimensions.get("window").width;
 
 const trendingImages = [
   require("../assets/search-page-images/daniel-schludi-mbGxz7pt0jM-unsplash.jpg"),
@@ -48,24 +54,110 @@ const categories = [
   "Country",
 ];
 
-type RootStackParamList = {
-  Category: { category: string };
-};
+const gradientColors: [string, string][] = [
+  ["#ff7e5f", "#feb47b"],
+  ["#86A8E7", "#91EAE4"],
+  ["#D299C2", "#F2C94C"],
+  ["#C6FFDD", "#FBD786"],
+  ["#a18cd1", "#fbc2eb"],
+  ["#FF9A9E", "#FECFEF"],
+];
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// --- Trending Card ---
+// Updated TrendingCard component and grid layout:
+function TrendingCard({
+  image,
+  index,
+  onPress,
+  isPlaying,
+}: {
+  image: any;
+  index: number;
+  onPress: () => void;
+  isPlaying: boolean;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <AnimatedTouchable
+      onPressIn={() => {
+        Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+      }}
+      onPress={onPress}
+      style={{ transform: [{ scale }], marginBottom: 16 }}
+    >
+      <View style={styles.trendingItemContainer}>
+        <Image source={image} style={styles.trendingImage} />
+        <View style={styles.trendingIconOverlay}>
+          {isPlaying ? (
+            <Ionicons name="pause-circle" size={36} color="#FF9800" />
+          ) : (
+            <Ionicons name="play-circle" size={36} color="#FF9800" />
+          )}
+        </View>
+      </View>
+    </AnimatedTouchable>
+  );
+}
+
+// --- Category Card ---
+// Uses a full-width horizontal card with an image on the left and bold text on the right.
+function CategoryCard({
+  category,
+  image,
+  index,
+  onPress,
+}: {
+  category: string;
+  image: any;
+  index: number;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <AnimatedTouchable
+      onPressIn={() => {
+        Animated.spring(scale, {
+          toValue: 0.95,
+          useNativeDriver: true,
+        }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }).start();
+      }}
+      onPress={onPress}
+      style={{ transform: [{ scale }], marginBottom: 16 }}
+    >
+      <LinearGradient
+        colors={gradientColors[index % gradientColors.length]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.categoryCard}
+      >
+        <Image source={image} style={styles.categoryCardImage} />
+        <Text style={styles.categoryCardText}>{category}</Text>
+      </LinearGradient>
+    </AnimatedTouchable>
+  );
+}
 
 export default function SearchPage() {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NavigationProp<{ Category: { category: string } }>>();
   const [searchQuery, setSearchQuery] = useState("");
-  // State to manage sound objects keyed by trending index
-  const [soundObjects, setSoundObjects] = useState<{
-    [key: number]: Audio.Sound;
-  }>({});
-  // Manage the UI overlay status for each trending image
-  const [audioStatus, setAudioStatus] = useState<{
-    [key: number]: "hidden" | "play" | "stop";
-  }>({});
+  const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
+  const [audioStatus, setAudioStatus] = useState<{ [key: number]: "hidden" | "play" | "stop" }>({});
 
   const handleAudioToggle = async (index: number) => {
-    // Stop any other playing audio
+    // Stop other audios if playing
     for (const key in soundObjects) {
       const keyNum = parseInt(key);
       if (keyNum !== index && audioStatus[keyNum] === "play") {
@@ -84,7 +176,6 @@ export default function SearchPage() {
       }
     }
     const currentStatus = audioStatus[index] || "hidden";
-
     if (currentStatus === "hidden" || currentStatus === "stop") {
       try {
         const { sound } = await Audio.Sound.createAsync(trendingMusics[index]);
@@ -118,121 +209,84 @@ export default function SearchPage() {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Redesigned search bar */}
-      <View style={styles.searchBarContainer}>
-        <Ionicons
-          name="search"
-          size={24}
-          color="#ccc"
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for music..."
-          placeholderTextColor="#ccc"
-          value={searchQuery}
-          onChangeText={(text) => setSearchQuery(text)}
-        />
-      </View>
-
-      {searchQuery.trim() !== "" ? (
-        // If the user types something, show search results (filtered categories)
-        <View style={styles.searchResults}>
-          <Text style={styles.sectionTitle}>Search Results</Text>
-          <View style={styles.resultsGrid}>
-            {filteredCategories.length > 0 ? (
-              filteredCategories.map((cat) => {
-                // Get the index from the full categories array to fetch corresponding image
-                const imgIndex = categories.indexOf(cat);
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    style={styles.categoryItem}
-                    onPress={() =>
-                      navigation.navigate("Category", { category: cat })
-                    }
-                  >
-                    <Image
-                      source={categoryImages[imgIndex]}
-                      style={styles.categoryImage}
-                    />
-                    <Text style={styles.categoryText}>{cat}</Text>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={styles.noResults}>
-                No matching categories found.
-              </Text>
-            )}
-          </View>
+    // A subtle dark gradient background works well on both iOS and Android devices.
+    <LinearGradient colors={["#121212", "#1b1b1b"]} style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <View style={styles.searchBarContainer}>
+          <Ionicons name="search" size={24} color="#ccc" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for music..."
+            placeholderTextColor="#ccc"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
-      ) : (
-        <>
-          {/* Trending Section */}
-          <Text style={styles.sectionTitle}>Trending Now</Text>
-          <View style={styles.trendingGrid}>
-            {trendingImages.map((image, index) => {
-              const status = audioStatus[index] || "hidden";
-              return (
-                <TouchableOpacity
+        {searchQuery.trim() !== "" ? (
+          <View style={styles.searchResults}>
+            <Text style={styles.sectionTitle}>Search Results</Text>
+            <View style={styles.resultsGrid}>
+              {filteredCategories.length > 0 ? (
+                filteredCategories.map((cat) => {
+                  const imgIndex = categories.indexOf(cat);
+                  return (
+                    <CategoryCard
+                      key={cat}
+                      category={cat}
+                      index={imgIndex}
+                      image={categoryImages[imgIndex]}
+                      onPress={() =>
+                        navigation.navigate("Category", { category: cat })
+                      }
+                    />
+                  );
+                })
+              ) : (
+                <Text style={styles.noResults}>No matching categories found.</Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Trending Now</Text>
+            <View style={styles.trendingGrid}>
+              {trendingImages.map((image, index) => (
+                <TrendingCard
                   key={index}
-                  style={styles.trendingItem}
+                  image={image}
+                  index={index}
+                  isPlaying={audioStatus[index] === "play"}
                   onPress={() => handleAudioToggle(index)}
-                >
-                  <Image source={image} style={styles.trendingImage} />
-                  {status !== "hidden" && (
-                    <View style={styles.overlayIcon}>
-                      {status === "play" ? (
-                        <Ionicons
-                          name="play-circle"
-                          size={32}
-                          color="#FF9800"
-                        />
-                      ) : (
-                        <Ionicons
-                          name="stop-circle"
-                          size={32}
-                          color="#F44336"
-                        />
-                      )}
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Categories Section */}
-          <Text style={styles.sectionTitle}>All Categories</Text>
-          <View style={styles.categoriesGrid}>
-            {categories.map((category, index) => (
-              <TouchableOpacity
-                key={category}
-                style={styles.categoryItem}
-                onPress={() => navigation.navigate("Category", { category })}
-              >
-                <Image
-                  source={categoryImages[index]}
-                  style={styles.categoryImage}
                 />
-                <Text style={styles.categoryText}>{category}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
-    </ScrollView>
+              ))}
+            </View>
+            <Text style={styles.sectionTitle}>All Categories</Text>
+            <View style={styles.categoriesList}>
+              {categories.map((category, index) => (
+                <CategoryCard
+                  key={category}
+                  category={category}
+                  index={index}
+                  image={categoryImages[index]}
+                  onPress={() => navigation.navigate("Category", { category })}
+                />
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
   container: {
     flex: 1,
-    backgroundColor: "#121212",
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingBottom: 20,
+    // Increased top padding to move search bar down
+    paddingTop: 60,
   },
   searchBarContainer: {
     flexDirection: "row",
@@ -240,82 +294,84 @@ const styles = StyleSheet.create({
     backgroundColor: "#1f1f1f",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     marginBottom: 20,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 16,
-  },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, color: "#fff", fontSize: 16 },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     color: "#0D9488",
-    marginVertical: 10,
+    marginVertical: 12,
   },
+  // Trending Now – unique full-width horizontal cards
+  trendingList: { flexDirection: "column" },
   trendingGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  trendingItem: {
-    width: "48%",
-    aspectRatio: 1,
+  trendingItemContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 20,
+    alignSelf: "center",
     marginBottom: 16,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#1f1f1f",
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 8,
+    elevation: 7,
+    backgroundColor: "#333",
   },
   trendingImage: {
-    width: "100%",
-    height: "100%",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
   },
-  overlayIcon: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -16 }, { translateY: -16 }],
-    opacity: 0.9,
-  },
-  categoriesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  categoryItem: {
-    width: "30%",
-    backgroundColor: "#1f1f1f",
-    borderRadius: 8,
+  trendingIconOverlay: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
     alignItems: "center",
+  },
+  // All Categories – full-width horizontal cards (unchanged)
+  categoriesList: { flexDirection: "column" },
+  categoryCard: {
+    width: "98%",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 20,
     marginBottom: 16,
-    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 5,
+    elevation: 5,
   },
-  categoryImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginBottom: 6,
+  categoryCardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
   },
-  categoryText: {
+  categoryCardText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 22,
+    fontWeight: "700",
   },
-  searchResults: {
-    marginBottom: 30,
-  },
+  // Search results & grid
+  searchResults: { marginBottom: 30 },
   resultsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  noResults: {
-    color: "#fff",
-    fontStyle: "italic",
-  },
+  noResults: { color: "#fff", fontStyle: "italic" },
 });

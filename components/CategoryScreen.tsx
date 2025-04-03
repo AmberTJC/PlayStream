@@ -14,17 +14,20 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from "@expo/vector-icons";
 
 type RootStackParamList = {
+  Main: undefined;
   Category: { category: string };
 };
 
 type CategoryScreenRouteProp = RouteProp<RootStackParamList, "Category">;
+type CategoryScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Category">;
 
 export default function CategoryScreen() {
   const route = useRoute<CategoryScreenRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<CategoryScreenNavigationProp>();
   const { category } = route.params;
 
   const songs = [
@@ -56,7 +59,8 @@ export default function CategoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  backButton: { marginBottom: 10 },
+  // Added marginTop to move the back arrow down for easier accessibility
+  backButton: { marginTop: 30, marginBottom: 10 },
   item: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#ddd" },
   title: { fontSize: 18 },
 });
