@@ -1,118 +1,119 @@
-import React, {useState} from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { Layout, Text, Toggle, useTheme } from '@ui-kitten/components';
 import { Ionicons } from '@expo/vector-icons';
+
 
 interface SettingsPageProps {
   onSignOut: () => void;
+  toggleTheme: () => void;
+  isDarkMode: boolean;
 }
 
-export default function SettingsPage({ onSignOut }: SettingsPageProps)
-{
+export default function SettingsPage({
+  onSignOut,
+  toggleTheme,
+  isDarkMode,
+}: SettingsPageProps) {
+  const [stickyRepeat, setStickyRepeat] = useState(false);
+  const [gaplessPlayback, setGaplessPlayback] = useState(false);
 
-    const [stickyRepeat, setStickyRepeat] = useState(false);
-    const [gaplessPlayback, setGaplessPlayback] = useState(false);
-    const [displayMode, setDisplayMode] = useState(false);
+  const theme = useTheme();
 
+  return (
+    <Layout style={[
+      styles.container,
+      { backgroundColor: isDarkMode ? '#000' : '#fff' }
+    ]}>
+      
+      {/* Header */}
+      <Layout style={[styles.header, { backgroundColor: theme['color-header-background'] }]} level="1">
+        <Text category="h6" style={styles.headerText}>PlayStream</Text>
+      </Layout>
+      {/* Account Section */}
+      <Layout style={styles.section}>
+        <Layout style={styles.row}>
+          <Ionicons name="person-circle-outline" size={32} color="#0D9488" />
+          <Text category="s1" style={styles.sectionTitle}>Account Settings</Text>
+        </Layout>
+        <Text appearance="hint" style={styles.subText}>Manage Account</Text>
+      </Layout>
 
-    return(
-        <View style={styles.container}>
-            <View style={styles.header}>
-                    <Text style={styles.headerText}>PlayStream</Text>
-                  </View>
-            <View>
-                <View style = {styles.row}>
-                <Ionicons style ={styles.icons} name = "person-circle-outline" size={40} color="#0D9488"></Ionicons>
-                <Text style = {styles.sectionTitle}>Account Settings</Text>
-                </View>
-                <Text style = {styles.subText}>Manage Account</Text>
-            </View>
-            <View>
-                <View style = {styles.row}>
-                <Ionicons style ={styles.icons} name = "repeat-outline" size={40} color="#0D9488"></Ionicons>
-                <Text style = {styles.sectionTitle}>Sticky Repeat</Text>
-                <Switch
-                            value={stickyRepeat}
-                            onValueChange={setStickyRepeat}
-                            thumbColor={stickyRepeat ? "#0D9488" : "#888"}
-                            trackColor={{ false: "#333", true: "#0D9488" }}
-                        />
-                </View>
-                <Text style = {styles.subText}>Repeat persists between song selections</Text>
-            </View>
-            <View>
-                <View style = {styles.row}>
-            <Ionicons style ={styles.icons} name = "sync-outline" size={40} color="#0D9488"></Ionicons>
-                <Text style = {styles.sectionTitle}>Gapless Playback</Text>
-                <Switch
-                            value={gaplessPlayback}
-                            onValueChange={setGaplessPlayback}
-                            thumbColor={gaplessPlayback ? "#0D9488" : "#888"}
-                            trackColor={{ false: "#333", true: "#0D9488" }}
-                        />
-                </View>
-                <Text style = {styles.subText}>Plays without pausing between songs</Text>
-            </View>
-            <View>
-                <View style = {styles.row}>
-            <Ionicons style ={styles.icons} name = "toggle-outline" size={40} color="#0D9488"></Ionicons>
-                <Text style = {styles.sectionTitle}>Display</Text>
-                <Switch
-                            value={displayMode}
-                            onValueChange={setDisplayMode}
-                            thumbColor={displayMode ? "#0D9488" : "#888"}
-                            trackColor={{ false: "#333", true: "#0D9488" }}
-                        />
-                </View>
-                <Text style = {styles.subText}>Toggles between dark and light mode</Text>
-            </View>
-        </View>
+      {/* Sticky Repeat */}
+      <Layout style={styles.section}>
+        <Layout style={styles.row}>
+          <Ionicons name="repeat-outline" size={32} color="#0D9488" />
+          <Text category="s1" style={styles.sectionTitle}>Sticky Repeat</Text>
+          <Toggle
+            checked={stickyRepeat}
+            onChange={setStickyRepeat}
+          />
+        </Layout>
+        <Text appearance="hint" style={styles.subText}>Repeat persists between song selections</Text>
+      </Layout>
 
-        
-    );
+      {/* Gapless Playback */}
+      <Layout style={styles.section}>
+        <Layout style={styles.row}>
+          <Ionicons name="sync-outline" size={32} color="#0D9488" />
+          <Text category="s1" style={styles.sectionTitle}>Gapless Playback</Text>
+          <Toggle
+            checked={gaplessPlayback}
+            onChange={setGaplessPlayback}
+          />
+        </Layout>
+        <Text appearance="hint" style={styles.subText}>Plays without pausing between songs</Text>
+      </Layout>
 
-    
-       
+      {/* Display Mode */}
+      <Layout style={styles.section}>
+        <Layout style={styles.row} level="1">
+          <Ionicons name="toggle-outline" size={32} color="#0D9488" />
+          <Text category="s1" style={styles.sectionTitle}>Display</Text>
+          <Toggle
+            checked={isDarkMode}
+            onChange={toggleTheme}
+          />
+        </Layout>
+        <Text appearance="hint" style={styles.subText}>Toggles between dark and light mode</Text>
+      </Layout>
+    </Layout>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#000',
-      paddingTop: 0, 
-    },
-    header: {
-      backgroundColor: '#0D9488',
-      padding: 12,
-      alignItems: 'center',
-    },
-    headerText: {
-      color: '#fff',
-      fontSize: 20,
-      fontWeight: '600',
-    },
-    sectionTitle: {
-        color: '#0D9488',
-        fontSize: 18,
-        fontWeight: '600',
-        marginLeft: 10,
-        marginTop: 15,
-        flex: 1,
-        flexShrink: 1,
-      },
-      subText: {
-        color: '#0D9488',
-        fontSize: 14,
-        marginBottom: 40,
-        marginLeft: 50,
-      },
-      icons: {
-        marginTop: 15,
-      },
-
-      row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        
-      }
+  container: {
+    flex: 1,
+  },
+  header: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  headerText: {
+    color: '#fff',
+  },
+  section: {
+  backgroundColor: 'transparent',
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  marginBottom: 32,
+  borderRadius: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+   
+  },
+  sectionTitle: {
+    marginLeft: 10,
+    flex: 1,
+    color: '#0D9488',
+  },
+  subText: {
+    marginLeft: 42,
+    marginTop: 4,
+    fontSize: 13,
+  },
 });

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { TouchableOpacity } from 'react-native';
 import * as eva from '@eva-design/eva';
 import { ApplicationProvider, Layout } from '@ui-kitten/components';
-import theme from './themes/dark-theme.json';
+import { default as darkTheme } from './themes/dark-theme.json';
+import { default as lightTheme } from './themes/light-theme.json';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -19,7 +20,15 @@ import CategoryScreen from './components/CategoryScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function MainTabs({ handleSignOut }: { handleSignOut: () => void }) {
+function MainTabs({
+  handleSignOut,
+  toggleTheme,
+  isDarkMode,
+}: {
+  handleSignOut: () => void;
+  toggleTheme: () => void;
+  isDarkMode: boolean;
+})  {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -43,13 +52,26 @@ function MainTabs({ handleSignOut }: { handleSignOut: () => void }) {
       <Tab.Screen name="Home" component={HomePage} />
       <Tab.Screen name="Search" component={SearchPage} />
       <Tab.Screen name="Settings">
-        {(props) => <SettingsPage onSignOut={handleSignOut} {...props} />}
-      </Tab.Screen>
+  {(props) => (
+    <SettingsPage
+      onSignOut={handleSignOut}
+      toggleTheme={toggleTheme}
+      isDarkMode={isDarkMode}
+      {...props}
+    />
+  )}
+</Tab.Screen>
     </Tab.Navigator>
   );
 }
 
 export default function App() {
+
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const theme = isDarkMode ? { ...eva.dark, ...darkTheme } : { ...eva.light, ...lightTheme };
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
 
@@ -110,13 +132,19 @@ export default function App() {
   };
 
   return (
-    <ApplicationProvider {...eva} theme={{ ...eva.dark, ...theme }}>
+    <ApplicationProvider {...eva} theme={theme}>
       {isAuthenticated ? (
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Main">
-              {() => <MainTabs handleSignOut={handleSignOut} />}
-            </Stack.Screen>
+          <Stack.Screen name="Main">
+  {() => (
+    <MainTabs
+      handleSignOut={handleSignOut}
+      toggleTheme={toggleTheme}
+      isDarkMode={isDarkMode}
+    />
+  )}
+</Stack.Screen>
             {/* Category is not part of the bottom tabs */}
             <Stack.Screen name="Category" component={CategoryScreen} />
           </Stack.Navigator>
