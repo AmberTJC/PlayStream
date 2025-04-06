@@ -49,7 +49,9 @@ function MainTabs({
         tabBarStyle: { backgroundColor: '#1F2937' },
       })}
     >
-      <Tab.Screen name="Home" component={HomePage} />
+      <Tab.Screen name="Home">
+  {(props) => <HomePage {...props} isDarkMode={isDarkMode} />}
+</Tab.Screen>
       <Tab.Screen name="Search" component={SearchPage} />
       <Tab.Screen name="Settings">
   {(props) => (

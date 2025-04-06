@@ -45,5 +45,6 @@
   "color-danger-800": "#931835",
   "color-danger-900": "#7A0E31",
   "color-header-background": "#0D9488",
-  "color-background-main": "#fff"
+  "color-background-main": "#fff",
+  "music-player-background": "#A7F3D0"
 }
