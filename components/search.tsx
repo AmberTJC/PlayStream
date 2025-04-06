@@ -1,22 +1,38 @@
 import React, { useState, useRef } from "react";
 import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
   Animated,
   ScrollView,
+  StyleSheet,
   Image,
+  TouchableOpacity,
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import {
+  Layout,
+  Text,
+  Input,
+  useTheme,
+} from "@ui-kitten/components";
 
 const deviceWidth = Dimensions.get("window").width;
+
+interface TrendingCardProps {
+  image: any;
+  index: number;
+  onPress: () => void;
+  isPlaying: boolean;
+}
+
+interface CategoryCardProps {
+  category: string;
+  image: any;
+  index: number;
+  onPress: () => void;
+}
 
 const trendingImages = [
   require("../assets/search-page-images/daniel-schludi-mbGxz7pt0jM-unsplash.jpg"),
@@ -36,6 +52,7 @@ const trendingMusics = [
   require("../assets/Trending musics/so-fresh-315255.mp3"),
 ];
 
+const categories = ["Trending", "Classic", "Chill", "Salsa", "Newest", "Country"];
 const categoryImages = [
   require("../assets/search-page-images/thomas-kelley-2ZWCDBuw1B8-unsplash.jpg"),
   require("../assets/search-page-images/hanny-naibaho-aWXVxy8BSzc-unsplash.jpg"),
@@ -43,15 +60,6 @@ const categoryImages = [
   require("../assets/search-page-images/nainoa-shizuru-NcdG9mK3PBY-unsplash.jpg"),
   require("../assets/search-page-images/wes-hicks-MEL-jJnm7RQ-unsplash.jpg"),
   require("../assets/search-page-images/marcela-laskoski-YrtFlrLo2DQ-unsplash.jpg"),
-];
-
-const categories = [
-  "Trending",
-  "Classic",
-  "Chill",
-  "Salsa",
-  "Newest",
-  "Country",
 ];
 
 const gradientColors: [string, string][] = [
@@ -65,81 +73,161 @@ const gradientColors: [string, string][] = [
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// --- Trending Card ---
-// Updated TrendingCard component and grid layout:
-function TrendingCard({
-  image,
-  index,
-  onPress,
-  isPlaying,
-}: {
-  image: any;
-  index: number;
-  onPress: () => void;
-  isPlaying: boolean;
-}) {
+export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
+  const navigation = useNavigation<NavigationProp<{ Category: { category: string } }>>();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
+  const [audioStatus, setAudioStatus] = useState<{ [key: number]: 'hidden' | 'play' | 'stop' }>({});
+  const theme = useTheme();
+
+  const handleAudioToggle = async (index: number) => {
+    for (const key in soundObjects) {
+      const keyNum = parseInt(key);
+      if (keyNum !== index && audioStatus[keyNum] === 'play') {
+        await soundObjects[keyNum]?.stopAsync();
+        await soundObjects[keyNum]?.unloadAsync();
+        setSoundObjects(prev => {
+          const copy = { ...prev };
+          delete copy[keyNum];
+          return copy;
+        });
+        setAudioStatus(prev => ({ ...prev, [keyNum]: 'hidden' }));
+      }
+    }
+
+    const current = audioStatus[index] || 'hidden';
+    if (current === 'hidden' || current === 'stop') {
+      const { sound } = await Audio.Sound.createAsync(trendingMusics[index]);
+      await sound.playAsync();
+      setSoundObjects(prev => ({ ...prev, [index]: sound }));
+      setAudioStatus(prev => ({ ...prev, [index]: 'play' }));
+    } else {
+      const sound = soundObjects[index];
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSoundObjects(prev => {
+        const copy = { ...prev };
+        delete copy[index];
+        return copy;
+      });
+      setAudioStatus(prev => ({ ...prev, [index]: 'hidden' }));
+    }
+  };
+
+  const filteredCategories = categories.filter(cat =>
+    cat.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <Layout style={{ flex: 1 }} level="1">
+  <ScrollView
+    contentContainerStyle={{
+      padding: 16,
+    }}
+    >
+        <Layout style={styles.searchBarContainer}level="2"
+>
+          <Ionicons name="search" size={24} color={isDarkMode ? '#ccc' : '#333'} style={styles.searchIcon} />
+          <Input
+             placeholder="Search for music..."
+             value={searchQuery}
+             onChangeText={setSearchQuery}
+             style={{ flex: 1 }}
+             placeholderTextColor={isDarkMode ? '#aaa' : '#666'}
+             status="basic"
+/>
+        </Layout>
+
+        {searchQuery.trim() !== '' ? (
+          <Layout>
+            <Text style={styles.sectionTitle}>Search Results</Text>
+            <Layout style={styles.resultsGrid}>
+              {filteredCategories.length > 0 ? (
+                filteredCategories.map(cat => {
+                  const index = categories.indexOf(cat);
+                  return (
+                    <CategoryCard
+                      key={cat}
+                      category={cat}
+                      index={index}
+                      image={categoryImages[index]}
+                      onPress={() => navigation.navigate('Category', { category: cat })}
+                    />
+                  );
+                })
+              ) : (
+                <Text appearance="hint" style={{ fontStyle: 'italic' }}>
+                  No matching categories found.
+                </Text>
+              )}
+            </Layout>
+          </Layout>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Trending Now</Text>
+            <Layout style={styles.trendingGrid}>
+              {trendingImages.map((image, index) => (
+                <TrendingCard
+                  key={index}
+                  image={image}
+                  index={index}
+                  onPress={() => handleAudioToggle(index)}
+                  isPlaying={audioStatus[index] === 'play'}
+                />
+              ))}
+            </Layout>
+
+            <Text style={styles.sectionTitle}>All Categories</Text>
+            <Layout style={styles.categoriesList}>
+              {categories.map((cat, index) => (
+                <CategoryCard
+                  key={cat}
+                  category={cat}
+                  index={index}
+                  image={categoryImages[index]}
+                  onPress={() => navigation.navigate('Category', { category: cat })}
+                />
+              ))}
+            </Layout>
+          </>
+        )}
+      </ScrollView>
+    </Layout>
+  );
+}
+
+function TrendingCard({ image, index, onPress, isPlaying }: TrendingCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
+
   return (
     <AnimatedTouchable
-      onPressIn={() => {
-        Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start();
-      }}
-      onPressOut={() => {
-        Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }).start();
-      }}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
       onPress={onPress}
       style={{ transform: [{ scale }], marginBottom: 16 }}
     >
-      <View style={styles.trendingItemContainer}>
+      <Layout style={styles.trendingItemContainer}>
         <Image source={image} style={styles.trendingImage} />
-        <View style={styles.trendingIconOverlay}>
-          {isPlaying ? (
-            <Ionicons name="pause-circle" size={36} color="#FF9800" />
-          ) : (
-            <Ionicons name="play-circle" size={36} color="#FF9800" />
-          )}
-        </View>
-      </View>
+        <Layout style={styles.trendingIconOverlay}>
+          <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle'} size={36} color="#FF9800" />
+        </Layout>
+      </Layout>
     </AnimatedTouchable>
   );
 }
 
-// --- Category Card ---
-// Uses a full-width horizontal card with an image on the left and bold text on the right.
-function CategoryCard({
-  category,
-  image,
-  index,
-  onPress,
-}: {
-  category: string;
-  image: any;
-  index: number;
-  onPress: () => void;
-}) {
+function CategoryCard({ category, image, index, onPress }: CategoryCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
+
   return (
     <AnimatedTouchable
-      onPressIn={() => {
-        Animated.spring(scale, {
-          toValue: 0.95,
-          useNativeDriver: true,
-        }).start();
-      }}
-      onPressOut={() => {
-        Animated.spring(scale, {
-          toValue: 1,
-          friction: 4,
-          useNativeDriver: true,
-        }).start();
-      }}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
       onPress={onPress}
       style={{ transform: [{ scale }], marginBottom: 16 }}
     >
       <LinearGradient
         colors={gradientColors[index % gradientColors.length]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
         style={styles.categoryCard}
       >
         <Image source={image} style={styles.categoryCardImage} />
@@ -149,164 +237,29 @@ function CategoryCard({
   );
 }
 
-export default function SearchPage() {
-  const navigation =
-    useNavigation<NavigationProp<{ Category: { category: string } }>>();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
-  const [audioStatus, setAudioStatus] = useState<{ [key: number]: "hidden" | "play" | "stop" }>({});
-
-  const handleAudioToggle = async (index: number) => {
-    // Stop other audios if playing
-    for (const key in soundObjects) {
-      const keyNum = parseInt(key);
-      if (keyNum !== index && audioStatus[keyNum] === "play") {
-        try {
-          await soundObjects[keyNum].stopAsync();
-          await soundObjects[keyNum].unloadAsync();
-          setSoundObjects((prev) => {
-            const newState = { ...prev };
-            delete newState[keyNum];
-            return newState;
-          });
-          setAudioStatus((prev) => ({ ...prev, [keyNum]: "hidden" }));
-        } catch (error) {
-          console.error(`Error stopping sound at index ${keyNum}:`, error);
-        }
-      }
-    }
-    const currentStatus = audioStatus[index] || "hidden";
-    if (currentStatus === "hidden" || currentStatus === "stop") {
-      try {
-        const { sound } = await Audio.Sound.createAsync(trendingMusics[index]);
-        await sound.playAsync();
-        setSoundObjects((prev) => ({ ...prev, [index]: sound }));
-        setAudioStatus((prev) => ({ ...prev, [index]: "play" }));
-      } catch (error) {
-        console.error("Error playing sound:", error);
-      }
-    } else if (currentStatus === "play") {
-      try {
-        const sound = soundObjects[index];
-        if (sound) {
-          await sound.stopAsync();
-          await sound.unloadAsync();
-          setSoundObjects((prev) => {
-            const newState = { ...prev };
-            delete newState[index];
-            return newState;
-          });
-        }
-        setAudioStatus((prev) => ({ ...prev, [index]: "hidden" }));
-      } catch (error) {
-        console.error("Error stopping sound:", error);
-      }
-    }
-  };
-
-  const filteredCategories = categories.filter((cat) =>
-    cat.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    // A subtle dark gradient background works well on both iOS and Android devices.
-    <LinearGradient colors={["#121212", "#1b1b1b"]} style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.searchBarContainer}>
-          <Ionicons name="search" size={24} color="#ccc" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for music..."
-            placeholderTextColor="#ccc"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-        {searchQuery.trim() !== "" ? (
-          <View style={styles.searchResults}>
-            <Text style={styles.sectionTitle}>Search Results</Text>
-            <View style={styles.resultsGrid}>
-              {filteredCategories.length > 0 ? (
-                filteredCategories.map((cat) => {
-                  const imgIndex = categories.indexOf(cat);
-                  return (
-                    <CategoryCard
-                      key={cat}
-                      category={cat}
-                      index={imgIndex}
-                      image={categoryImages[imgIndex]}
-                      onPress={() =>
-                        navigation.navigate("Category", { category: cat })
-                      }
-                    />
-                  );
-                })
-              ) : (
-                <Text style={styles.noResults}>No matching categories found.</Text>
-              )}
-            </View>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.sectionTitle}>Trending Now</Text>
-            <View style={styles.trendingGrid}>
-              {trendingImages.map((image, index) => (
-                <TrendingCard
-                  key={index}
-                  image={image}
-                  index={index}
-                  isPlaying={audioStatus[index] === "play"}
-                  onPress={() => handleAudioToggle(index)}
-                />
-              ))}
-            </View>
-            <Text style={styles.sectionTitle}>All Categories</Text>
-            <View style={styles.categoriesList}>
-              {categories.map((category, index) => (
-                <CategoryCard
-                  key={category}
-                  category={category}
-                  index={index}
-                  image={categoryImages[index]}
-                  onPress={() => navigation.navigate("Category", { category })}
-                />
-              ))}
-            </View>
-          </>
-        )}
-      </ScrollView>
-    </LinearGradient>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 16,
-    paddingBottom: 20,
-    // Increased top padding to move search bar down
     paddingTop: 60,
+    paddingBottom: 20,
   },
   searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1f1f1f",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 20,
   },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: "#fff", fontSize: 16 },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0D9488",
     marginVertical: 12,
+    color: "#0D9488",
   },
-  // Trending Now – unique full-width horizontal cards
-  trendingList: { flexDirection: "column" },
   trendingGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -317,13 +270,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderRadius: 20,
-    alignSelf: "center",
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 8,
-    elevation: 7,
     backgroundColor: "#333",
   },
   trendingImage: {
@@ -339,8 +285,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // All Categories – full-width horizontal cards (unchanged)
-  categoriesList: { flexDirection: "column" },
+  categoriesList: {
+    flexDirection: "column",
+  },
   categoryCard: {
     width: "98%",
     alignSelf: "center",
@@ -348,12 +295,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderRadius: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 5,
-    elevation: 5,
   },
   categoryCardImage: {
     width: 80,
@@ -366,12 +307,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
   },
-  // Search results & grid
   searchResults: { marginBottom: 30 },
   resultsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  noResults: { color: "#fff", fontStyle: "italic" },
 });

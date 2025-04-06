@@ -52,7 +52,9 @@ function MainTabs({
       <Tab.Screen name="Home">
   {(props) => <HomePage {...props} isDarkMode={isDarkMode} />}
 </Tab.Screen>
-      <Tab.Screen name="Search" component={SearchPage} />
+<Tab.Screen name="Search">
+  {(props) => <SearchPage {...props} isDarkMode={isDarkMode} />}
+</Tab.Screen>
       <Tab.Screen name="Settings">
   {(props) => (
     <SettingsPage
