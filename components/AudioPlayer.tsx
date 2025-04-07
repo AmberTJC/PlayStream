@@ -5,11 +5,12 @@
 // It shows song details including an image, title, and artist as well as a slider for the current song position.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { fetchTracksByGenre, Track } from "../services/musicService";
 
 // Reuse the trending assets from SearchPage
 const trendingImages = [
@@ -33,46 +34,100 @@ const trendingMusics = [
 export default function AudioPlayer() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { index } = route.params as { index: number };
+  const { trackId, genre } = route.params as { trackId?: string; genre?: string; index?: number };
 
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [playlist, setPlaylist] = useState<Track[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    const loadSound = async () => {
+    // Load tracks based on genre if provided
+    const loadTracks = async () => {
+      setIsLoading(true);
       try {
-        const { sound } = await Audio.Sound.createAsync(trendingMusics[index], {
-          volume,
-        });
-        setSound(sound);
-        const status = await sound.getStatusAsync();
-        if (status.isLoaded) {
-          setDuration(status.durationMillis || 0);
-        }
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded) {
-            setPosition(status.positionMillis);
-            setIsPlaying(status.isPlaying);
+        // Default to 'trending' genre if none provided
+        const genreToLoad = genre || 'trending';
+        const tracks = await fetchTracksByGenre(genreToLoad, 10);
+        
+        if (tracks.length > 0) {
+          setPlaylist(tracks);
+          
+          // If trackId is provided, find its index in the playlist
+          if (trackId) {
+            const index = tracks.findIndex(track => track.id === trackId);
+            if (index !== -1) {
+              setCurrentIndex(index);
+              loadTrack(tracks[index]);
+            } else {
+              loadTrack(tracks[0]);
+            }
+          } else {
+            loadTrack(tracks[0]);
           }
-        });
-        await sound.playAsync();
-      } catch (err) {
-        console.error("Error loading audio", err);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Error loading tracks:", error);
+        setIsLoading(false);
       }
     };
 
-    loadSound();
+    loadTracks();
 
     return () => {
       if (sound) {
         sound.unloadAsync();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [genre, trackId]);
+
+  const loadTrack = async (track: Track) => {
+    setIsLoading(true);
+    setCurrentTrack(track);
+    
+    try {
+      // Unload any existing sound first
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: track.audio },
+        { volume },
+        onPlaybackStatusUpdate
+      );
+      
+      setSound(newSound);
+      const status = await newSound.getStatusAsync();
+      if (status.isLoaded) {
+        setDuration(status.durationMillis || 0);
+        await newSound.playAsync();
+      }
+    } catch (err) {
+      console.error("Error loading audio", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPosition(status.positionMillis);
+      setIsPlaying(status.isPlaying);
+      
+      // Auto-advance to next track when current one finishes
+      if (status.didJustFinish) {
+        playNextTrack();
+      }
+    }
+  };
 
   const togglePlayPause = async () => {
     if (!sound) return;
@@ -98,19 +153,27 @@ export default function AudioPlayer() {
   };
 
   const skipForward = async () => {
-    if (sound) {
-      let newPosition = position + 15000;
-      if (newPosition > duration) newPosition = duration;
-      await sound.setPositionAsync(newPosition);
-    }
+    playNextTrack();
   };
 
   const skipBackward = async () => {
-    if (sound) {
-      let newPosition = position - 15000;
-      if (newPosition < 0) newPosition = 0;
-      await sound.setPositionAsync(newPosition);
-    }
+    playPreviousTrack();
+  };
+
+  const playNextTrack = () => {
+    if (playlist.length === 0) return;
+    
+    const nextIndex = (currentIndex + 1) % playlist.length;
+    setCurrentIndex(nextIndex);
+    loadTrack(playlist[nextIndex]);
+  };
+
+  const playPreviousTrack = () => {
+    if (playlist.length === 0) return;
+    
+    const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+    setCurrentIndex(prevIndex);
+    loadTrack(playlist[prevIndex]);
   };
 
   const formatTime = (millis: number) => {
@@ -120,6 +183,15 @@ export default function AudioPlayer() {
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
+  if (isLoading && !currentTrack) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0D9488" />
+        <Text style={styles.loadingText}>Loading music...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -128,51 +200,62 @@ export default function AudioPlayer() {
       >
         <Ionicons name="arrow-back" size={24} color="white" />
       </TouchableOpacity>
-      <Image source={trendingImages[index]} style={styles.image} />
-      <Text style={styles.title}>Song Title {index + 1}</Text>
-      <Text style={styles.artist}>Artist Name</Text>
-
-      <Slider
-        style={styles.slider}
-        minimumValue={0}
-        maximumValue={duration}
-        value={position}
-        minimumTrackTintColor="#0D9488"
-        maximumTrackTintColor="#fff"
-        onSlidingComplete={onSliderComplete}
-      />
-
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{formatTime(position)}</Text>
-        <Text style={styles.timeText}>{formatTime(duration)}</Text>
-      </View>
-
-      <View style={styles.controls}>
-        <TouchableOpacity onPress={skipBackward}>
-          <Ionicons name="play-back" size={40} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={togglePlayPause}>
-          <Ionicons
-            name={isPlaying ? "pause" : "play"}
-            size={40}
-            color="white"
+      
+      {currentTrack ? (
+        <>
+          <Image 
+            source={{ uri: currentTrack.image }} 
+            style={styles.image}
+            defaultSource={require("../assets/search-page-images/daniel-schludi-mbGxz7pt0jM-unsplash.jpg")}
           />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={skipForward}>
-          <Ionicons name="play-forward" size={40} color="white" />
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.title}>{currentTrack.name}</Text>
+          <Text style={styles.artist}>{currentTrack.artist_name}</Text>
 
-      <Text style={styles.volumeLabel}>Volume</Text>
-      <Slider
-        style={styles.volumeSlider}
-        minimumValue={0}
-        maximumValue={1}
-        value={volume}
-        minimumTrackTintColor="#0D9488"
-        maximumTrackTintColor="#fff"
-        onSlidingComplete={onVolumeChange}
-      />
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={duration}
+            value={position}
+            minimumTrackTintColor="#0D9488"
+            maximumTrackTintColor="#fff"
+            onSlidingComplete={onSliderComplete}
+          />
+
+          <View style={styles.timeContainer}>
+            <Text style={styles.timeText}>{formatTime(position)}</Text>
+            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+          </View>
+
+          <View style={styles.controls}>
+            <TouchableOpacity onPress={skipBackward}>
+              <Ionicons name="play-back" size={40} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={togglePlayPause}>
+              <Ionicons
+                name={isPlaying ? "pause" : "play"}
+                size={40}
+                color="white"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={skipForward}>
+              <Ionicons name="play-forward" size={40} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.volumeLabel}>Volume</Text>
+          <Slider
+            style={styles.volumeSlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={volume}
+            minimumTrackTintColor="#0D9488"
+            maximumTrackTintColor="#fff"
+            onSlidingComplete={onVolumeChange}
+          />
+        </>
+      ) : (
+        <Text style={styles.errorText}>No track available</Text>
+      )}
     </View>
   );
 }
@@ -183,6 +266,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     alignItems: "center",
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 20,
+    fontSize: 16,
   },
   backButton: {
     alignSelf: "flex-start",
@@ -199,11 +293,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
     marginBottom: 5,
+    textAlign: "center",
   },
   artist: {
     fontSize: 16,
     color: "#aaa",
     marginBottom: 20,
+    textAlign: "center", 
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#ff4f4f",
+    textAlign: "center",
   },
   slider: {
     width: "100%",

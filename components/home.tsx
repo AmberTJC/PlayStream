@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image, ScrollView, Modal, TextInput, Alert, StyleSheet,
   TouchableOpacity,
@@ -8,6 +8,9 @@ import {
 } from '@ui-kitten/components';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
+import { useNavigation } from '@react-navigation/native';
+import { fetchPopularTrack, Track } from '../services/musicService';
 
 interface HomePageProps {
   setActiveTab?: (tab: string) => void;
@@ -26,6 +29,7 @@ const playlists = [
 
 export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
   const theme = useTheme();
+  const navigation = useNavigation();
   const musicPlayerBg = isDarkMode ? '#1F2937' : '#A7F3D0';
   
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -37,6 +41,153 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
   const [email, setEmail] = useState('Surush.Az@gmail.com');
   const [dob, setDob] = useState('2001-07-01');
   const [password, setPassword] = useState('password');
+
+  // Music player state
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Configure audio mode when component mounts
+    const setupAudio = async () => {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    };
+    
+    setupAudio();
+    
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, []);
+
+  const togglePlayPause = async () => {
+    if (isLoading) return; // Prevent multiple clicks during loading
+    
+    if (!sound) {
+      setIsLoading(true);
+      // Fetch a track from our music service
+      try {
+        const track = await fetchPopularTrack();
+        
+        if (track) {
+          setCurrentTrack(track);
+          
+          const { sound: newSound } = await Audio.Sound.createAsync(
+            { uri: track.audio },
+            { shouldPlay: true },
+            onPlaybackStatusUpdate
+          );
+          
+          setSound(newSound);
+          setIsPlaying(true);
+          setIsLoading(false);
+        } else {
+          Alert.alert("Error", "No tracks available at the moment");
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Error loading track:", error);
+        Alert.alert("Error", "Could not load music from API");
+        setIsLoading(false);
+      }
+    } else {
+      try {
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await sound.pauseAsync();
+            setIsPlaying(false);
+          } else {
+            await sound.playAsync();
+            setIsPlaying(true);
+          }
+        }
+      } catch (error) {
+        console.error("Error toggling play/pause:", error);
+        // If error occurs, try to recreate the sound
+        if (currentTrack) {
+          try {
+            if (sound) {
+              await sound.unloadAsync();
+            }
+            const { sound: newSound } = await Audio.Sound.createAsync(
+              { uri: currentTrack.audio },
+              { shouldPlay: true },
+              onPlaybackStatusUpdate
+            );
+            setSound(newSound);
+            setIsPlaying(true);
+          } catch (innerError) {
+            console.error("Failed to recover playback:", innerError);
+            Alert.alert("Playback Error", "Could not control audio playback");
+          }
+        }
+      }
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setIsPlaying(status.isPlaying);
+      
+      // When track ends
+      if (status.didJustFinish) {
+        skipTrack();
+      }
+    } else if (status.error) {
+      console.error(`Playback error: ${status.error}`);
+      setIsPlaying(false);
+    }
+  };
+
+  const skipTrack = async () => {
+    setIsLoading(true);
+    
+    if (sound) {
+      try {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
+        setIsPlaying(false);
+      } catch (error) {
+        console.error("Error stopping playback:", error);
+      }
+    }
+    
+    // Load a new track
+    try {
+      const track = await fetchPopularTrack();
+      
+      if (track) {
+        setCurrentTrack(track);
+        
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: track.audio },
+          { shouldPlay: true },
+          onPlaybackStatusUpdate
+        );
+        
+        setSound(newSound);
+        setIsPlaying(true);
+      } else {
+        Alert.alert("Error", "No more tracks available");
+      }
+    } catch (error) {
+      console.error("Error loading next track:", error);
+      Alert.alert("Error", "Could not load next track");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -84,12 +235,22 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
 
       {/* Music Player */}
       <Layout style={[styles.musicPlayer, { backgroundColor: musicPlayerBg }]}>
+        <Text style={styles.nowPlayingText}>{currentTrack ? currentTrack.name : 'Press Play to Load Track'}</Text>
+        <Text style={styles.artistText}>{currentTrack ? currentTrack.artist_name : 'Stream music'}</Text>
         <Layout style={styles.controls}>
-          <Ionicons name="play-back" size={30} color="#0D9488" />
-          <Layout style={styles.playButton}>
-            <Ionicons name="play" size={40} color="#fff" />
-          </Layout>
-          <Ionicons name="play-forward" size={30} color="#0D9488" />
+          <TouchableOpacity onPress={skipTrack} disabled={isLoading}>
+            <Ionicons name="play-back" size={30} color={isLoading ? "#75918E" : "#0D9488"} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={togglePlayPause} style={[styles.playButton, isLoading && styles.disabledButton]} disabled={isLoading}>
+            {isLoading ? (
+              <Ionicons name="hourglass-outline" size={40} color="#fff" />
+            ) : (
+              <Ionicons name={isPlaying ? "pause" : "play"} size={40} color="#fff" />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={skipTrack} disabled={isLoading}>
+            <Ionicons name="play-forward" size={30} color={isLoading ? "#75918E" : "#0D9488"} />
+          </TouchableOpacity>
         </Layout>
       </Layout>
 
@@ -301,5 +462,18 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 12,
+  },
+  nowPlayingText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  artistText: {
+    fontSize: 16,
+    marginBottom: 15,
+    opacity: 0.8,
+  },
+  disabledButton: {
+    backgroundColor: '#75918E', // Grayed out color for disabled state
   },
 });
