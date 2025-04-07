@@ -19,8 +19,8 @@ interface HomePageProps {
 const playlists = [
   { name: 'Favourites', image: require('../assets/home-images/favs.jpg') },
   { name: 'Chill Vibes', image: require('../assets/home-images/chill vibes.png') },
-  { name: 'Acoustics', image: require('../assets/home-images/acoustics.jpg') },
-  { name: 'Throwbacks', image: require('../assets/home-images/Billy Joel.jpg') },
+  { name: 'Pop Hits', image: require('../assets/home-images/acoustics.jpg') },
+  { name: 'Oldies', image: require('../assets/home-images/Billy Joel.jpg') },
   { name: 'Party Music', image: require('../assets/home-images/party music.jpg') },
   { name: 'Country Vibes', image: require('../assets/home-images/country vibes.jpg') },
 ];
