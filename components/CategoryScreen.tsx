@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { fetchTracksByGenre, Track, audioManager } from "../services/musicService";
 import { Audio } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
+import { useThemeContext } from "../App"; // Import the theme context
 
 const deviceWidth = Dimensions.get("window").width;
 
@@ -34,6 +35,9 @@ type CategoryScreenRouteProp = RouteProp<RootStackParamList, "Category">;
 type CategoryScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Category">;
 
 export default function CategoryScreen() {
+  // Get theme context
+  const { isDarkMode } = useThemeContext();
+  
   const route = useRoute<CategoryScreenRouteProp>();
   const navigation = useNavigation<CategoryScreenNavigationProp>();
   const { category, limit = 30 } = route.params; // Default to 30 tracks
@@ -119,7 +123,15 @@ export default function CategoryScreen() {
     
     return (
       <TouchableOpacity 
-        style={[styles.trackItem, isActive && styles.activeTrackItem]} 
+        style={[
+          styles.trackItem, 
+          { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+          isActive && { 
+            backgroundColor: isDarkMode ? 'rgba(13,148,136,0.2)' : 'rgba(13,148,136,0.1)',
+            borderLeftWidth: 4,
+            borderLeftColor: '#0D9488',
+          }
+        ]} 
         onPress={() => playTrack(item)}
       >
         <Image 
@@ -128,9 +140,9 @@ export default function CategoryScreen() {
           defaultSource={require("../assets/search-page-images/daniel-schludi-mbGxz7pt0jM-unsplash.jpg")}
         />
         <View style={styles.trackInfo}>
-          <Text style={styles.trackTitle} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.trackArtist} numberOfLines={1}>{item.artist_name}</Text>
-          <Text style={styles.trackAlbum} numberOfLines={1}>{item.album_name}</Text>
+          <Text style={[styles.trackTitle, { color: isDarkMode ? '#fff' : '#000' }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.trackArtist, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }]} numberOfLines={1}>{item.artist_name}</Text>
+          <Text style={[styles.trackAlbum, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]} numberOfLines={1}>{item.album_name}</Text>
           
           {isActive && (
             <View style={styles.seekControlsRow}>
@@ -160,9 +172,9 @@ export default function CategoryScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: isDarkMode ? "#111827" : "#f5f5f5" }]}>
       <LinearGradient
-        colors={['#0D9488', '#111827']}
+        colors={isDarkMode ? ['#0D9488', '#111827'] : ['#0D9488', '#e0e0e0']}
         style={styles.header}
       >
         <TouchableOpacity
@@ -180,7 +192,7 @@ export default function CategoryScreen() {
       {isLoading && tracks.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0D9488" />
-          <Text style={styles.loadingText}>Loading {limit} tracks...</Text>
+          <Text style={[styles.loadingText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : '#333' }]}>Loading {limit} tracks...</Text>
         </View>
       ) : (
         <FlatList
@@ -191,8 +203,8 @@ export default function CategoryScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="musical-notes" size={50} color="rgba(255,255,255,0.2)" />
-              <Text style={styles.emptyText}>No tracks found for this category</Text>
+              <Ionicons name="musical-notes" size={50} color={isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"} />
+              <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : '#555' }]}>No tracks found for this category</Text>
             </View>
           }
         />
@@ -204,7 +216,6 @@ export default function CategoryScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "#111827",
   },
   header: {
     paddingTop: 50,
@@ -232,7 +243,6 @@ const styles = StyleSheet.create({
   loadingText: { 
     fontSize: 16, 
     marginTop: 12,
-    color: 'rgba(255,255,255,0.7)',
   },
   trackList: {
     padding: 16,
@@ -241,16 +251,10 @@ const styles = StyleSheet.create({
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     marginBottom: 12,
     padding: 12,
     overflow: 'hidden',
-  },
-  activeTrackItem: {
-    backgroundColor: 'rgba(13,148,136,0.2)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#0D9488',
   },
   trackImage: {
     width: 60,

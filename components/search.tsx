@@ -23,6 +23,7 @@ import {
   Button,
   Card,
 } from "@ui-kitten/components";
+import { useThemeContext } from "../App"; // Import the theme context
 
 const deviceWidth = Dimensions.get("window").width;
 const deviceHeight = Dimensions.get("window").height;
@@ -83,7 +84,10 @@ const tealGradients: [string, string][] = [
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
+export default function SearchPage() {
+  // Use the theme context instead of props
+  const { isDarkMode } = useThemeContext();
+  
   const navigation = useNavigation<NavigationProp<{ Category: { category: string, limit?: number } }>>();
   const [searchQuery, setSearchQuery] = useState('');
   const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
@@ -170,9 +174,9 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#111827' : '#f5f5f5' }]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D9488" />
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: isDarkMode ? '#111827' : '#f5f5f5' }]}>
         {/* Big Logo Banner */}
         <View style={styles.logoBanner}>
           <Text style={styles.logoText}>PLAYSTREAM</Text>
@@ -199,87 +203,56 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
           </View>
         </View>
         
-        {/* Category Chips */}
-        <ScrollView 
-          horizontal 
+        {/* Category Chips - Horizontal Scroll */}
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.categoryChipsContainer}
+          style={[styles.categoryChipsContainer, { backgroundColor: isDarkMode ? '#121212' : '#e0e0e0' }]}
           contentContainerStyle={styles.categoryChipsContent}
         >
-          {categories.map((category) => (
-            <TouchableOpacity 
-              key={category}
-              onPress={() => handleCategoryPress(category)}
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
               style={[
                 styles.categoryChip,
-                activeCategory === category && styles.categoryChipActive
+                activeCategory === cat && styles.activeChip,
+                { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
               ]}
+              onPress={() => handleCategoryPress(cat)}
             >
-              <Text style={styles.categoryChipText}>{category}</Text>
+              <Text style={[
+                styles.categoryChipText,
+                activeCategory === cat && styles.activeChipText,
+                { color: isDarkMode ? '#fff' : '#333' }
+              ]}>
+                {cat}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
         
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="white" />
-            <Text style={styles.loadingText}>Loading amazing music...</Text>
+            <ActivityIndicator size="large" color="#0D9488" />
           </View>
         ) : (
-          <Animated.ScrollView
-            contentContainerStyle={styles.scrollContainer}
+          <Animated.ScrollView 
+            style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+            contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }}
           >
-            {searchQuery.trim() !== '' ? (
-              <View style={styles.resultsContainer}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Search Results</Text>
-                  <View style={styles.resultCountContainer}>
-                    <Text style={styles.resultCountText}>{filteredCategories.length}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.resultsGrid}>
-                  {filteredCategories.length > 0 ? (
-                    filteredCategories.map(cat => {
-                      const index = categories.indexOf(cat);
-                      return (
-                        <CategoryCard
-                          key={cat}
-                          category={cat}
-                          index={index}
-                          image={categoryImages[index]}
-                          onPress={() => handleCategoryPress(cat)}
-                          isLoading={loadingCategory === cat}
-                        />
-                      );
-                    })
-                  ) : (
-                    <View style={styles.emptyContainer}>
-                      <Ionicons name="musical-notes" size={40} color="rgba(255,255,255,0.4)" />
-                      <Text style={styles.emptyText}>
-                        No matching categories found.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ) : (
+            {searchQuery.length === 0 ? (
               <>
-                {/* Featured Track */}
+                {/* Featured Section */}
                 <View style={styles.featuredContainer}>
-                  <Text style={styles.sectionTitle}>Featured</Text>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#333' }]}>Featured</Text>
                   <ImageBackground 
                     source={trendingImages[0]}
                     style={styles.featuredCard}
                     imageStyle={styles.featuredCardImage}
                   >
                     <LinearGradient
-                      colors={['transparent', 'rgba(213,0,0,0.9)']}
+                      colors={['transparent', 'rgba(13,148,136,0.9)']}
                       style={styles.featuredGradient}
                     >
                       <View style={styles.featuredContent}>
@@ -305,7 +278,7 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
 
                 {/* Trending Tracks */}
                 <View style={styles.trendingContainer}>
-                  <Text style={styles.sectionTitle}>Trending Now</Text>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#333' }]}>Trending Now</Text>
                   <View style={styles.trendingGrid}>
                     {trendingImages.slice(1).map((image, index) => (
                       <TrendingCard
@@ -321,7 +294,7 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
 
                 {/* Genres Grid */}
                 <View style={styles.genresContainer}>
-                  <Text style={styles.sectionTitle}>Explore Genres</Text>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#333' }]}>Explore Genres</Text>
                   <View style={styles.categoriesList}>
                     {categories.map((cat, index) => (
                       <CategoryCard
@@ -336,6 +309,34 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
                   </View>
                 </View>
               </>
+            ) : (
+              // Search results
+              <View style={styles.searchResultsContainer}>
+                <Text style={[styles.resultsTitle, { color: isDarkMode ? '#fff' : '#333' }]}>
+                  Results for "{searchQuery}"
+                </Text>
+                {filteredCategories.length > 0 ? (
+                  <View style={styles.categoriesList}>
+                    {filteredCategories.map((cat, index) => (
+                      <CategoryCard
+                        key={cat}
+                        category={cat}
+                        index={index}
+                        image={categoryImages[categories.indexOf(cat)]}
+                        onPress={() => handleCategoryPress(cat)}
+                        isLoading={loadingCategory === cat}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="search" size={64} color={isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"} />
+                    <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }]}>
+                      No categories found matching "{searchQuery}"
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
           </Animated.ScrollView>
         )}
@@ -480,50 +481,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  categoryChipActive: {
+  activeChip: {
     backgroundColor: '#0D9488',
   },
   categoryChipText: {
     color: 'white',
     fontWeight: '500',
   },
+  activeChipText: {
+    fontWeight: 'bold',
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    color: 'white',
-    marginTop: 16,
-    fontSize: 16,
-  },
-  scrollContainer: {
+  scrollContent: {
     padding: 16,
-  },
-  resultsContainer: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    color: '#0D9488',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  resultCountContainer: {
-    backgroundColor: '#0D9488',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  resultCountText: {
-    color: 'white',
-    fontWeight: 'bold',
   },
   featuredContainer: {
     marginBottom: 24,
@@ -584,11 +558,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  resultsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
   trackCardTouchable: {
     width: deviceWidth / 2 - 24,
     marginBottom: 12,
@@ -638,6 +607,21 @@ const styles = StyleSheet.create({
   playButtonActive: {
     backgroundColor: '#FF9800',
   },
+  searchResultsContainer: {
+    marginBottom: 24,
+  },
+  resultsTitle: {
+    color: '#0D9488',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  categoriesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
   emptyContainer: {
     padding: 24,
     alignItems: 'center',
@@ -650,12 +634,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 12,
-  },
-  categoriesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     marginTop: 12,
   },
   categoryCardTouchable: {
@@ -693,5 +671,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     bottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#0D9488',
   },
 });

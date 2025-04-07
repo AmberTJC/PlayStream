@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, createContext, useContext } from 'react';
 import { TouchableOpacity } from 'react-native';
 import * as eva from '@eva-design/eva';
 import { ApplicationProvider, Layout } from '@ui-kitten/components';
@@ -17,18 +17,31 @@ import SignUpPage from './components/signup';
 import { supabase } from './lib/supabaseClient';
 import CategoryScreen from './components/CategoryScreen';
 
+// Create a Theme context to share theme state across the app
+interface ThemeContextType {
+  isDarkMode: boolean;
+  toggleTheme: () => void;
+}
+
+export const ThemeContext = createContext<ThemeContextType>({
+  isDarkMode: true,
+  toggleTheme: () => {},
+});
+
+// Custom hook to use the theme context
+export const useThemeContext = () => useContext(ThemeContext);
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs({
   handleSignOut,
-  toggleTheme,
-  isDarkMode,
 }: {
   handleSignOut: () => void;
-  toggleTheme: () => void;
-  isDarkMode: boolean;
 })  {
+  // Use the theme context directly
+  const { isDarkMode, toggleTheme } = useThemeContext();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -50,34 +63,38 @@ function MainTabs({
       })}
     >
       <Tab.Screen name="Home">
-  {(props) => <HomePage {...props} isDarkMode={isDarkMode} />}
-</Tab.Screen>
-<Tab.Screen name="Search">
-  {(props) => <SearchPage {...props} isDarkMode={isDarkMode} />}
-</Tab.Screen>
+        {(props) => <HomePage {...props} isDarkMode={isDarkMode} />}
+      </Tab.Screen>
+      <Tab.Screen name="Search">
+        {(props) => <SearchPage {...props} isDarkMode={isDarkMode} />}
+      </Tab.Screen>
       <Tab.Screen name="Settings">
-  {(props) => (
-    <SettingsPage
-      onSignOut={handleSignOut}
-      toggleTheme={toggleTheme}
-      isDarkMode={isDarkMode}
-      {...props}
-    />
-  )}
-</Tab.Screen>
+        {(props) => (
+          <SettingsPage
+            onSignOut={handleSignOut}
+            toggleTheme={toggleTheme}
+            isDarkMode={isDarkMode}
+            {...props}
+          />
+        )}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
 
 export default function App() {
-
   const [isDarkMode, setIsDarkMode] = useState(true);
   const theme = isDarkMode ? { ...eva.dark, ...darkTheme } : { ...eva.light, ...lightTheme };
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
+
+  // Theme context value
+  const themeContextValue = {
+    isDarkMode,
+    toggleTheme,
+  };
 
   const handleSignIn = async (email: string, password: string) => {
     try {
@@ -137,25 +154,21 @@ export default function App() {
 
   return (
     <ApplicationProvider {...eva} theme={theme}>
-      {isAuthenticated ? (
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Main">
-  {() => (
-    <MainTabs
-      handleSignOut={handleSignOut}
-      toggleTheme={toggleTheme}
-      isDarkMode={isDarkMode}
-    />
-  )}
-</Stack.Screen>
-            {/* Category is not part of the bottom tabs */}
-            <Stack.Screen name="Category" component={CategoryScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      ) : (
-        <Layout style={{ flex: 1 }}>{renderAuthScreens()}</Layout>
-      )}
+      <ThemeContext.Provider value={themeContextValue}>
+        {isAuthenticated ? (
+          <NavigationContainer>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="Main">
+                {() => <MainTabs handleSignOut={handleSignOut} />}
+              </Stack.Screen>
+              {/* Category is not part of the bottom tabs */}
+              <Stack.Screen name="Category" component={CategoryScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        ) : (
+          <Layout style={{ flex: 1 }}>{renderAuthScreens()}</Layout>
+        )}
+      </ThemeContext.Provider>
     </ApplicationProvider>
   );
 }
