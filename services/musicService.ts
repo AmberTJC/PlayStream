@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { Audio } from 'expo-av';
 
 // Use Deezer API which doesn't require authentication for basic searches
 const DEEZER_API_BASE = 'https://api.deezer.com';
@@ -9,6 +10,98 @@ const DEFAULT_IMAGE = 'https://e-cdns-images.dzcdn.net/images/cover/1000x1000-00
 // Cache for tracks to avoid repeated API calls
 let tracksCache: Track[] = [];
 let currentTrackIndex = 0;
+
+// Global audio manager to ensure only one song plays at a time
+class GlobalAudioManager {
+  private static instance: GlobalAudioManager;
+  private currentSound: Audio.Sound | null = null;
+  private onPlaybackStatusUpdateCallback: ((status: any) => void) | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): GlobalAudioManager {
+    if (!GlobalAudioManager.instance) {
+      GlobalAudioManager.instance = new GlobalAudioManager();
+    }
+    return GlobalAudioManager.instance;
+  }
+
+  async loadAndPlayTrack(audioUri: string, onPlaybackStatusUpdate?: (status: any) => void): Promise<Audio.Sound> {
+    // Stop any currently playing sound
+    await this.stopCurrentTrack();
+    
+    // Set callback
+    this.onPlaybackStatusUpdateCallback = onPlaybackStatusUpdate || null;
+    
+    // Create and play new sound
+    console.log("Loading new track:", audioUri);
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: audioUri },
+      { shouldPlay: true },
+      this.handlePlaybackStatusUpdate.bind(this)
+    );
+    
+    this.currentSound = sound;
+    return sound;
+  }
+  
+  private handlePlaybackStatusUpdate(status: any) {
+    // Forward status to component callback if set
+    if (this.onPlaybackStatusUpdateCallback) {
+      this.onPlaybackStatusUpdateCallback(status);
+    }
+  }
+
+  async stopCurrentTrack(): Promise<void> {
+    if (this.currentSound) {
+      console.log("Stopping current track");
+      try {
+        await this.currentSound.stopAsync();
+        await this.currentSound.unloadAsync();
+      } catch (error) {
+        console.error("Error stopping track:", error);
+      }
+      this.currentSound = null;
+    }
+  }
+
+  async pauseCurrentTrack(): Promise<void> {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.pauseAsync();
+      } catch (error) {
+        console.error("Error pausing track:", error);
+      }
+    }
+  }
+
+  async resumeCurrentTrack(): Promise<void> {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.playAsync();
+      } catch (error) {
+        console.error("Error resuming track:", error);
+      }
+    }
+  }
+
+  async seekCurrentTrack(positionMillis: number): Promise<void> {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.setPositionAsync(positionMillis);
+      } catch (error) {
+        console.error("Error seeking track:", error);
+      }
+    }
+  }
+
+  getCurrentSound(): Audio.Sound | null {
+    return this.currentSound;
+  }
+}
+
+// Export the singleton instance
+export const audioManager = GlobalAudioManager.getInstance();
 
 // Define different genres with pre-selected tracks
 const GENRES = {

@@ -13,11 +13,17 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
+  Dimensions,
 } from "react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from "@expo/vector-icons";
-import { fetchTracksByGenre, Track } from "../services/musicService";
+import { fetchTracksByGenre, Track, audioManager } from "../services/musicService";
+import { Audio } from "expo-av";
+import { LinearGradient } from "expo-linear-gradient";
+
+const deviceWidth = Dimensions.get("window").width;
 
 type RootStackParamList = {
   Main: undefined;
@@ -34,6 +40,10 @@ export default function CategoryScreen() {
   
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   useEffect(() => {
     const loadTracks = async () => {
@@ -50,20 +60,124 @@ export default function CategoryScreen() {
     };
 
     loadTracks();
+    
+    // Clean up when component unmounts
+    return () => {
+      // No need to unload sound here as it's managed globally
+    };
   }, [category, limit]);
+
+  const playTrack = async (track: Track) => {
+    try {
+      setCurrentTrack(track);
+      setIsLoading(true);
+      
+      // Use the global audio manager to play the track
+      await audioManager.loadAndPlayTrack(track.audio, onPlaybackStatusUpdate);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("Error playing track:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPosition(status.positionMillis);
+      setDuration(status.durationMillis);
+      setIsPlaying(status.isPlaying);
+    }
+  };
+  
+  const togglePlayPause = async () => {
+    if (isPlaying) {
+      await audioManager.pauseCurrentTrack();
+    } else {
+      await audioManager.resumeCurrentTrack();
+    }
+  };
+  
+  const seekBackward = async () => {
+    const newPosition = Math.max(0, position - 15000); // 15 seconds back
+    await audioManager.seekCurrentTrack(newPosition);
+  };
+  
+  const seekForward = async () => {
+    const newPosition = Math.min(duration, position + 15000); // 15 seconds forward
+    await audioManager.seekCurrentTrack(newPosition);
+  };
+  
+  const formatTime = (millis: number) => {
+    const minutes = Math.floor(millis / 60000);
+    const seconds = Math.floor((millis % 60000) / 1000);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  const renderTrackItem = ({ item }: { item: Track }) => {
+    const isActive = currentTrack?.id === item.id;
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.trackItem, isActive && styles.activeTrackItem]} 
+        onPress={() => playTrack(item)}
+      >
+        <Image 
+          source={{ uri: item.image }} 
+          style={styles.trackImage}
+          defaultSource={require("../assets/search-page-images/daniel-schludi-mbGxz7pt0jM-unsplash.jpg")}
+        />
+        <View style={styles.trackInfo}>
+          <Text style={styles.trackTitle} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.trackArtist} numberOfLines={1}>{item.artist_name}</Text>
+          <Text style={styles.trackAlbum} numberOfLines={1}>{item.album_name}</Text>
+          
+          {isActive && (
+            <View style={styles.seekControlsRow}>
+              <TouchableOpacity onPress={seekBackward} style={styles.trackSeekButton}>
+                <Text style={styles.trackSeekText}>-15s</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={seekForward} style={styles.trackSeekButton}>
+                <Text style={styles.trackSeekText}>+15s</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        <View style={styles.trackControls}>
+          {isActive && isPlaying ? (
+            <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+              <Ionicons name="pause" size={22} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => playTrack(item)} style={styles.playButton}>
+              <Ionicons name="play" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
+      <LinearGradient
+        colors={['#0D9488', '#111827']}
+        style={styles.header}
       >
-        <Ionicons name="arrow-back" size={24} color="#0D9488" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        
+        <Text style={styles.categoryTitle}>{category}</Text>
+        
+        <Text style={styles.trackCount}>{tracks.length} tracks</Text>
+      </LinearGradient>
       
-      <Text style={styles.categoryTitle}>{category}</Text>
-      
-      {isLoading ? (
+      {isLoading && tracks.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0D9488" />
           <Text style={styles.loadingText}>Loading {limit} tracks...</Text>
@@ -72,14 +186,14 @@ export default function CategoryScreen() {
         <FlatList
           data={tracks}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.title}>{item.name}</Text>
-              <Text style={styles.artist}>{item.artist_name}</Text>
-            </View>
-          )}
+          renderItem={renderTrackItem}
+          contentContainerStyle={styles.trackList}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No tracks found for this category</Text>
+            <View style={styles.emptyContainer}>
+              <Ionicons name="musical-notes" size={50} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.emptyText}>No tracks found for this category</Text>
+            </View>
           }
         />
       )}
@@ -88,14 +202,119 @@ export default function CategoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  // Added marginTop to move the back arrow down for easier accessibility
-  backButton: { marginTop: 30, marginBottom: 10 },
-  item: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#ddd" },
-  title: { fontSize: 18 },
-  categoryTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 10 },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadingText: { fontSize: 18, marginTop: 10 },
-  emptyText: { fontSize: 18, textAlign: "center", marginTop: 10 },
-  artist: { fontSize: 14, color: "#666" },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#111827",
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+  },
+  backButton: { 
+    marginBottom: 16,
+  },
+  categoryTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: '#fff',
+    marginBottom: 8,
+  },
+  trackCount: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center" 
+  },
+  loadingText: { 
+    fontSize: 16, 
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  trackList: {
+    padding: 16,
+    paddingBottom: 16, // Reduced padding since no mini player anymore
+  },
+  trackItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 12,
+    overflow: 'hidden',
+  },
+  activeTrackItem: {
+    backgroundColor: 'rgba(13,148,136,0.2)',
+    borderLeftWidth: 4,
+    borderLeftColor: '#0D9488',
+  },
+  trackImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  trackInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  trackTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  trackArtist: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 2,
+  },
+  trackAlbum: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 4,
+  },
+  trackControls: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0D9488',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  seekControlsRow: {
+    flexDirection: 'row',
+    marginTop: 6,
+  },
+  trackSeekButton: {
+    backgroundColor: 'rgba(13,148,136,0.3)',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  trackSeekText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
 });

@@ -10,7 +10,7 @@ import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { fetchTracksByGenre, Track } from "../services/musicService";
+import { fetchTracksByGenre, Track, audioManager } from "../services/musicService";
 
 // Reuse the trending assets from SearchPage
 const trendingImages = [
@@ -36,7 +36,6 @@ export default function AudioPlayer() {
   const navigation = useNavigation();
   const { trackId, genre } = route.params as { trackId?: string; genre?: string; index?: number };
 
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
@@ -88,9 +87,7 @@ export default function AudioPlayer() {
     loadTracks();
 
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
+      // No need to unload audio here as it's managed globally
     };
   }, [genre, trackId]);
 
@@ -99,23 +96,9 @@ export default function AudioPlayer() {
     setCurrentTrack(track);
     
     try {
-      // Unload any existing sound first
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: track.audio },
-        { volume },
-        onPlaybackStatusUpdate
-      );
-      
-      setSound(newSound);
-      const status = await newSound.getStatusAsync();
-      if (status.isLoaded) {
-        setDuration(status.durationMillis || 0);
-        await newSound.playAsync();
-      }
+      // Use global audio manager
+      await audioManager.loadAndPlayTrack(track.audio, onPlaybackStatusUpdate);
+      setIsPlaying(true);
     } catch (err) {
       console.error("Error loading audio", err);
     } finally {
@@ -126,6 +109,7 @@ export default function AudioPlayer() {
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
       setPosition(status.positionMillis);
+      setDuration(status.durationMillis || 0);
       setIsPlaying(status.isPlaying);
       
       // Auto-advance to next track when current one finishes
@@ -136,26 +120,21 @@ export default function AudioPlayer() {
   };
 
   const togglePlayPause = async () => {
-    if (!sound) return;
-    const status = await sound.getStatusAsync();
-    if (status.isLoaded && status.isPlaying) {
-      await sound.pauseAsync();
+    if (isPlaying) {
+      await audioManager.pauseCurrentTrack();
     } else {
-      await sound.playAsync();
+      await audioManager.resumeCurrentTrack();
     }
   };
 
   const onVolumeChange = async (val: number) => {
     setVolume(val);
-    if (sound) {
-      await sound.setVolumeAsync(val);
-    }
+    // Volume control is not implemented in the audio manager yet
+    // We could add it if needed
   };
 
   const onSliderComplete = async (val: number) => {
-    if (sound) {
-      await sound.setPositionAsync(val);
-    }
+    await audioManager.seekCurrentTrack(val);
   };
 
   const skipForward = async () => {

@@ -9,7 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import { fetchPlaylistTracks, fetchPopularTrack, Track } from '../services/musicService';
+import { fetchPlaylistTracks, fetchPopularTrack, Track, audioManager } from '../services/musicService';
 import { Animated, Easing } from 'react-native';
 
 
@@ -41,7 +41,6 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   const [dob, setDob] = useState('2001-07-01');
   const [password, setPassword] = useState('password');
 
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,26 +57,9 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
     });
 
     return () => {
-      if (sound) sound.unloadAsync();
+      // No need to unload sound here as it's managed globally
     };
   }, []);
-
-  const playTrack = async (track: Track) => {
-    try {
-      if (sound) await sound.unloadAsync();
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: track.audio },
-        { shouldPlay: true },
-        onPlaybackStatusUpdate
-      );
-      setCurrentTrack(track);
-      setSound(newSound);
-      setIsPlaying(true);
-    } catch (error) {
-      console.error("Error playing track:", error);
-      Alert.alert("Playback error", "Unable to play selected track.");
-    }
-  };
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
@@ -86,15 +68,31 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
     }
   };
 
+  const playTrack = async (track: Track) => {
+    try {
+      setCurrentTrack(track);
+      setIsLoading(true);
+      await audioManager.loadAndPlayTrack(track.audio, onPlaybackStatusUpdate);
+      setIsPlaying(true);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error playing track:", error);
+      Alert.alert("Playback error", "Unable to play selected track.");
+      setIsLoading(false);
+    }
+  };
+
   const skipTrack = async () => {
     setIsLoading(true);
     try {
+      // If we have tracks in our playlist, use those instead of fetching new ones
       if (allTracks.length > 1) {
         const nextIndex = (currentTrackIndex + 1) % allTracks.length;
         setCurrentTrackIndex(nextIndex);
         await playTrack(allTracks[nextIndex]);
         console.log(`Playing track ${nextIndex + 1} of ${allTracks.length}`);
       } else {
+        // Otherwise fetch a new random track
         const track = await fetchPopularTrack();
         if (track) await playTrack(track);
         else Alert.alert("Error", "No more tracks available");
@@ -108,21 +106,18 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   };
 
   const togglePlayPause = async () => {
-    if (!sound) {
+    if (!currentTrack) {
       const track = await fetchPopularTrack();
       if (track) await playTrack(track);
       return;
     }
 
-    const status = await sound.getStatusAsync();
-    if (status.isLoaded) {
-      if (status.isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
-      }
+    if (isPlaying) {
+      await audioManager.pauseCurrentTrack();
+      setIsPlaying(false);
+    } else {
+      await audioManager.resumeCurrentTrack();
+      setIsPlaying(true);
     }
   };
 
