@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Image, ScrollView, Modal, TextInput, Alert, StyleSheet,
   TouchableOpacity, View, ActivityIndicator
@@ -9,7 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import { fetchPlaylistTracks, fetchPopularTrack, Track } from '../services/musicService';
+import { fetchPlaylistTracks, fetchPopularTrack, Track, audioManager } from '../services/musicService';
 import { Animated, Easing } from 'react-native';
 
 
@@ -59,23 +59,6 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
       // No need to unload sound here as it's managed globally
     };
   }, []);
-
-  const playTrack = async (track: Track) => {
-    try {
-      if (sound) await sound.unloadAsync();
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: track.audio },
-        { shouldPlay: true },
-        onPlaybackStatusUpdate
-      );
-      setCurrentTrack(track);
-      setSound(newSound);
-      setIsPlaying(true);
-    } catch (error) {
-      console.error("Error playing track:", error);
-      Alert.alert("Playback error", "Unable to play selected track.");
-    }
-  };
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
