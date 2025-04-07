@@ -45,6 +45,7 @@ export default function AudioPlayer() {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [totalTracks, setTotalTracks] = useState(0);
 
   useEffect(() => {
     // Load tracks based on genre if provided
@@ -53,10 +54,15 @@ export default function AudioPlayer() {
       try {
         // Default to 'trending' genre if none provided
         const genreToLoad = genre || 'trending';
-        const tracks = await fetchTracksByGenre(genreToLoad, 10);
+        console.log(`Loading 30 tracks for genre: ${genreToLoad}`);
+        
+        // Increased to 30 tracks instead of 10
+        const tracks = await fetchTracksByGenre(genreToLoad, 30);
+        setTotalTracks(tracks.length);
         
         if (tracks.length > 0) {
           setPlaylist(tracks);
+          console.log(`Successfully loaded ${tracks.length} tracks for ${genreToLoad}`);
           
           // If trackId is provided, find its index in the playlist
           if (trackId) {
@@ -187,7 +193,7 @@ export default function AudioPlayer() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0D9488" />
-        <Text style={styles.loadingText}>Loading music...</Text>
+        <Text style={styles.loadingText}>Loading up to 30 tracks...</Text>
       </View>
     );
   }
@@ -210,6 +216,7 @@ export default function AudioPlayer() {
           />
           <Text style={styles.title}>{currentTrack.name}</Text>
           <Text style={styles.artist}>{currentTrack.artist_name}</Text>
+          <Text style={styles.libraryInfo}>Track {currentIndex + 1} of {totalTracks}</Text>
 
           <Slider
             style={styles.slider}
@@ -334,5 +341,10 @@ const styles = StyleSheet.create({
   volumeSlider: {
     width: "100%",
     height: 40,
+  },
+  libraryInfo: {
+    color: "#aaa",
+    marginBottom: 20,
+    textAlign: "center",
   },
 });

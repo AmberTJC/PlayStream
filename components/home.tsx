@@ -45,6 +45,8 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [allTracks, setAllTracks] = useState<Track[]>([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -87,9 +89,16 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   const skipTrack = async () => {
     setIsLoading(true);
     try {
-      const track = await fetchPopularTrack();
-      if (track) await playTrack(track);
-      else Alert.alert("Error", "No more tracks available");
+      if (allTracks.length > 1) {
+        const nextIndex = (currentTrackIndex + 1) % allTracks.length;
+        setCurrentTrackIndex(nextIndex);
+        await playTrack(allTracks[nextIndex]);
+        console.log(`Playing track ${nextIndex + 1} of ${allTracks.length}`);
+      } else {
+        const track = await fetchPopularTrack();
+        if (track) await playTrack(track);
+        else Alert.alert("Error", "No more tracks available");
+      }
     } catch (error) {
       console.error("Skip error:", error);
       Alert.alert("Error", "Couldn't load next track.");
@@ -120,9 +129,13 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   const handlePlaylistPress = async (playlistName: string) => {
     setIsLoading(true);
     try {
-      const tracks = await fetchPlaylistTracks(playlistName);
+      console.log(`Loading 30 tracks for playlist: ${playlistName}`);
+      const tracks = await fetchPlaylistTracks(playlistName, 30);
+      
       if (tracks.length > 0) {
+        console.log(`Successfully loaded ${tracks.length} tracks for ${playlistName}`);
         await playTrack(tracks[0]);
+        setAllTracks(tracks);
       } else {
         Alert.alert("No tracks", `No songs found for "${playlistName}".`);
       }

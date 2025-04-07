@@ -84,12 +84,13 @@ const tealGradients: [string, string][] = [
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
-  const navigation = useNavigation<NavigationProp<{ Category: { category: string } }>>();
+  const navigation = useNavigation<NavigationProp<{ Category: { category: string, limit?: number } }>>();
   const [searchQuery, setSearchQuery] = useState('');
   const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
   const [audioStatus, setAudioStatus] = useState<{ [key: number]: 'hidden' | 'play' | 'stop' }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Trending");
+  const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -150,8 +151,18 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
   };
 
   const handleCategoryPress = (category: string) => {
-    setActiveCategory(category);
-    navigation.navigate('Category', { category });
+    setLoadingCategory(category);
+    
+    // Navigate with the higher limit
+    navigation.navigate('Category', { 
+      category, 
+      limit: 30 // Increased limit (30 tracks instead of 10)
+    });
+    
+    // Reset loading state after a short delay
+    setTimeout(() => {
+      setLoadingCategory(null);
+    }, 500);
   };
 
   const filteredCategories = categories.filter(cat =>
@@ -242,7 +253,8 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
                           category={cat}
                           index={index}
                           image={categoryImages[index]}
-                          onPress={() => navigation.navigate('Category', { category: cat })}
+                          onPress={() => handleCategoryPress(cat)}
+                          isLoading={loadingCategory === cat}
                         />
                       );
                     })
@@ -317,7 +329,8 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
                         category={cat}
                         index={index}
                         image={categoryImages[index]}
-                        onPress={() => navigation.navigate('Category', { category: cat })}
+                        onPress={() => handleCategoryPress(cat)}
+                        isLoading={loadingCategory === cat}
                       />
                     ))}
                   </View>
@@ -369,7 +382,7 @@ function TrendingCard({ image, index, onPress, isPlaying }: TrendingCardProps) {
   );
 }
 
-function CategoryCard({ category, image, index, onPress }: CategoryCardProps) {
+function CategoryCard({ category, image, index, onPress, isLoading }: CategoryCardProps & { isLoading?: boolean }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   return (
@@ -391,6 +404,9 @@ function CategoryCard({ category, image, index, onPress }: CategoryCardProps) {
         <Image source={image} style={styles.categoryCardImage} />
         <View style={styles.categoryOverlay}>
           <Text style={styles.categoryCardText}>{category}</Text>
+          {isLoading && (
+            <ActivityIndicator size="small" color="#fff" style={styles.categoryLoader} />
+          )}
         </View>
       </LinearGradient>
     </AnimatedTouchable>
@@ -672,5 +688,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  categoryLoader: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
   },
 });
