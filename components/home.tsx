@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Image, ScrollView, Modal, TextInput, Alert, StyleSheet,
-  TouchableOpacity,
+  TouchableOpacity, View, ActivityIndicator
 } from 'react-native';
 import {
   Layout, Text, Button, useTheme, Input,
@@ -9,14 +9,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import { useNavigation } from '@react-navigation/native';
-import { fetchPopularTrack, Track } from '../services/musicService';
+import { fetchPlaylistTracks, fetchPopularTrack, Track } from '../services/musicService';
 
 interface HomePageProps {
   setActiveTab?: (tab: string) => void;
   isDarkMode: boolean;
 }
-
 
 const playlists = [
   { name: 'Favourites', image: require('../assets/home-images/favs.jpg') },
@@ -27,163 +25,107 @@ const playlists = [
   { name: 'Country Vibes', image: require('../assets/home-images/country vibes.jpg') },
 ];
 
-export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
+export default function HomePage({ isDarkMode }: HomePageProps) {
   const theme = useTheme();
-  const navigation = useNavigation();
   const musicPlayerBg = isDarkMode ? '#1F2937' : '#A7F3D0';
-  
+
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-
   const [firstName, setFirstName] = useState('Surush');
   const [lastName, setLastName] = useState('Azaryun');
   const [email, setEmail] = useState('Surush.Az@gmail.com');
   const [dob, setDob] = useState('2001-07-01');
   const [password, setPassword] = useState('password');
 
-  // Music player state
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Configure audio mode when component mounts
-    const setupAudio = async () => {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-    };
-    
-    setupAudio();
-    
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: true,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    });
+
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
+      if (sound) sound.unloadAsync();
     };
   }, []);
 
-  const togglePlayPause = async () => {
-    if (isLoading) return; // Prevent multiple clicks during loading
-    
-    if (!sound) {
-      setIsLoading(true);
-      // Fetch a track from our music service
-      try {
-        const track = await fetchPopularTrack();
-        
-        if (track) {
-          setCurrentTrack(track);
-          
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: track.audio },
-            { shouldPlay: true },
-            onPlaybackStatusUpdate
-          );
-          
-          setSound(newSound);
-          setIsPlaying(true);
-          setIsLoading(false);
-        } else {
-          Alert.alert("Error", "No tracks available at the moment");
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error loading track:", error);
-        Alert.alert("Error", "Could not load music from API");
-        setIsLoading(false);
-      }
-    } else {
-      try {
-        const status = await sound.getStatusAsync();
-        if (status.isLoaded) {
-          if (status.isPlaying) {
-            await sound.pauseAsync();
-            setIsPlaying(false);
-          } else {
-            await sound.playAsync();
-            setIsPlaying(true);
-          }
-        }
-      } catch (error) {
-        console.error("Error toggling play/pause:", error);
-        // If error occurs, try to recreate the sound
-        if (currentTrack) {
-          try {
-            if (sound) {
-              await sound.unloadAsync();
-            }
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: currentTrack.audio },
-              { shouldPlay: true },
-              onPlaybackStatusUpdate
-            );
-            setSound(newSound);
-            setIsPlaying(true);
-          } catch (innerError) {
-            console.error("Failed to recover playback:", innerError);
-            Alert.alert("Playback Error", "Could not control audio playback");
-          }
-        }
-      }
+  const playTrack = async (track: Track) => {
+    try {
+      if (sound) await sound.unloadAsync();
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: track.audio },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate
+      );
+      setCurrentTrack(track);
+      setSound(newSound);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error("Error playing track:", error);
+      Alert.alert("Playback error", "Unable to play selected track.");
     }
   };
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
       setIsPlaying(status.isPlaying);
-      
-      // When track ends
-      if (status.didJustFinish) {
-        skipTrack();
-      }
-    } else if (status.error) {
-      console.error(`Playback error: ${status.error}`);
-      setIsPlaying(false);
+      if (status.didJustFinish) skipTrack();
     }
   };
 
   const skipTrack = async () => {
     setIsLoading(true);
-    
-    if (sound) {
-      try {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-        setSound(null);
-        setIsPlaying(false);
-      } catch (error) {
-        console.error("Error stopping playback:", error);
-      }
-    }
-    
-    // Load a new track
     try {
       const track = await fetchPopularTrack();
-      
-      if (track) {
-        setCurrentTrack(track);
-        
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: track.audio },
-          { shouldPlay: true },
-          onPlaybackStatusUpdate
-        );
-        
-        setSound(newSound);
-        setIsPlaying(true);
+      if (track) await playTrack(track);
+      else Alert.alert("Error", "No more tracks available");
+    } catch (error) {
+      console.error("Skip error:", error);
+      Alert.alert("Error", "Couldn't load next track.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const togglePlayPause = async () => {
+    if (!sound) {
+      const track = await fetchPopularTrack();
+      if (track) await playTrack(track);
+      return;
+    }
+
+    const status = await sound.getStatusAsync();
+    if (status.isLoaded) {
+      if (status.isPlaying) {
+        await sound.pauseAsync();
+        setIsPlaying(false);
       } else {
-        Alert.alert("Error", "No more tracks available");
+        await sound.playAsync();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const handlePlaylistPress = async (playlistName: string) => {
+    setIsLoading(true);
+    try {
+      const tracks = await fetchPlaylistTracks(playlistName);
+      if (tracks.length > 0) {
+        await playTrack(tracks[0]);
+      } else {
+        Alert.alert("No tracks", `No songs found for "${playlistName}".`);
       }
     } catch (error) {
-      console.error("Error loading next track:", error);
-      Alert.alert("Error", "Could not load next track");
+      console.error("Playlist load error:", error);
+      Alert.alert("Error", "Failed to load playlist.");
     } finally {
       setIsLoading(false);
     }
@@ -220,9 +162,9 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
 
   return (
     <Layout style={{ flex: 1 }} level="1">
-      {/* Header */}
+      {/* HEADER */}
       <Layout style={styles.header}>
-        <TouchableOpacity  onPress={() => setProfileModalVisible(true)} style={styles.profileButton}>
+        <TouchableOpacity onPress={() => setProfileModalVisible(true)} style={styles.profileButton}>
           {profileImage ? (
             <Image source={{ uri: profileImage }} style={styles.profileIcon} />
           ) : (
@@ -233,17 +175,25 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
         <Layout style={{ width: 40 }} />
       </Layout>
 
-      {/* Music Player */}
+      {/* MUSIC PLAYER */}
       <Layout style={[styles.musicPlayer, { backgroundColor: musicPlayerBg }]}>
-        <Text style={styles.nowPlayingText}>{currentTrack ? currentTrack.name : 'Press Play to Load Track'}</Text>
-        <Text style={styles.artistText}>{currentTrack ? currentTrack.artist_name : 'Stream music'}</Text>
+        <Text style={styles.nowPlayingText}>
+          {currentTrack ? currentTrack.name : 'Press Play to Load Track'}
+        </Text>
+        <Text style={styles.artistText}>
+          {currentTrack ? currentTrack.artist_name : 'Stream music'}
+        </Text>
         <Layout style={styles.controls}>
           <TouchableOpacity onPress={skipTrack} disabled={isLoading}>
             <Ionicons name="play-back" size={30} color={isLoading ? "#75918E" : "#0D9488"} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayPause} style={[styles.playButton, isLoading && styles.disabledButton]} disabled={isLoading}>
+          <TouchableOpacity
+            onPress={togglePlayPause}
+            style={[styles.playButton, isLoading && styles.disabledButton]}
+            disabled={isLoading}
+          >
             {isLoading ? (
-              <Ionicons name="hourglass-outline" size={40} color="#fff" />
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Ionicons name={isPlaying ? "pause" : "play"} size={40} color="#fff" />
             )}
@@ -254,35 +204,34 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
         </Layout>
       </Layout>
 
-      {/* Playlists */}
+      {/* PLAYLISTS */}
       <Layout style={styles.playlistsContainer}>
         <Text style={styles.sectionTitle}>My Playlists</Text>
         <ScrollView contentContainerStyle={styles.playlistsGrid}>
           {playlists.map((playlist) => (
-            <Layout key={playlist.name} style={styles.playlistItem}>
+            <TouchableOpacity
+              key={playlist.name}
+              onPress={() => handlePlaylistPress(playlist.name)}
+              style={styles.playlistItem}
+            >
               <Image source={playlist.image} style={styles.playlistImage} />
               <Text style={styles.playlistText}>{playlist.name}</Text>
-            </Layout>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </Layout>
 
-      {/* Modal */}
+      {/* Profile Modal*/}
       <Modal visible={profileModalVisible} animationType="slide" transparent>
         <Layout style={styles.modalOverlay}>
-        <Layout style={[styles.modalContent]} level="1">
+          <Layout style={[styles.modalContent]} level="1">
             <Text style={styles.modalTitle}>User Profile</Text>
-            <Button
-              style={styles.modalClose}
-              appearance="ghost"
-              onPress={() => {
-                setProfileModalVisible(false);
-                setEditMode(false);
-              }}
-            >
+            <Button style={styles.modalClose} appearance="ghost" onPress={() => {
+              setProfileModalVisible(false);
+              setEditMode(false);
+            }}>
               <Ionicons name="close" size={24} color="#fff" />
             </Button>
-
             {editMode ? (
               <>
                 <Layout style={styles.profileImageContainer}>
@@ -293,12 +242,8 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
                   )}
                 </Layout>
                 <Layout style={styles.imageOptions}>
-                  <Button onPress={handleTakePhoto} accessoryLeft={() => <Ionicons name="camera" size={20} color="#fff" />}>
-                    Camera
-                  </Button>
-                  <Button onPress={handleChooseFromLibrary} accessoryLeft={() => <Ionicons name="images" size={20} color="#fff" />}>
-                    Gallery
-                  </Button>
+                  <Button onPress={handleTakePhoto} accessoryLeft={() => <Ionicons name="camera" size={20} color="#fff" />}>Camera</Button>
+                  <Button onPress={handleChooseFromLibrary} accessoryLeft={() => <Ionicons name="images" size={20} color="#fff" />}>Gallery</Button>
                 </Layout>
                 <Input placeholder="First Name" value={firstName} onChangeText={setFirstName} style={styles.input} />
                 <Input placeholder="Last Name" value={lastName} onChangeText={setLastName} style={styles.input} />
@@ -332,7 +277,6 @@ export default function HomePage({ setActiveTab, isDarkMode }: HomePageProps) {
     </Layout>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -474,6 +418,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   disabledButton: {
-    backgroundColor: '#75918E', // Grayed out color for disabled state
+    backgroundColor: '#75918E',
   },
 });
