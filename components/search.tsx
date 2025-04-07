@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Animated,
   ScrollView,
@@ -6,6 +6,11 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  View,
+  ImageBackground,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
@@ -15,10 +20,15 @@ import {
   Layout,
   Text,
   Input,
-  useTheme,
+  Button,
+  Card,
 } from "@ui-kitten/components";
 
 const deviceWidth = Dimensions.get("window").width;
+const deviceHeight = Dimensions.get("window").height;
+
+// REDESIGNED VERSION WITH MATCHING COLORS
+console.log("REDESIGNED VERSION WITH MATCHING APP COLORS LOADED");
 
 interface TrendingCardProps {
   image: any;
@@ -62,13 +72,13 @@ const categoryImages = [
   require("../assets/search-page-images/marcela-laskoski-YrtFlrLo2DQ-unsplash.jpg"),
 ];
 
-const gradientColors: [string, string][] = [
-  ["#ff7e5f", "#feb47b"],
-  ["#86A8E7", "#91EAE4"],
-  ["#D299C2", "#F2C94C"],
-  ["#C6FFDD", "#FBD786"],
-  ["#a18cd1", "#fbc2eb"],
-  ["#FF9A9E", "#FECFEF"],
+const tealGradients: [string, string][] = [
+  ["#0D9488", "#14B8A6"],
+  ["#0F766E", "#0D9488"],
+  ["#14B8A6", "#2DD4BF"],
+  ["#0D9488", "#0F766E"],
+  ["#0E7490", "#0891B2"],
+  ["#06B6D4", "#22D3EE"],
 ];
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -78,9 +88,32 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [soundObjects, setSoundObjects] = useState<{ [key: number]: Audio.Sound }>({});
   const [audioStatus, setAudioStatus] = useState<{ [key: number]: 'hidden' | 'play' | 'stop' }>({});
-  const theme = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Trending");
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  
+  useEffect(() => {
+    // Start animations on load
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleAudioToggle = async (index: number) => {
+    setIsLoading(true);
+    
     for (const key in soundObjects) {
       const keyNum = parseInt(key);
       if (keyNum !== index && audioStatus[keyNum] === 'play') {
@@ -112,6 +145,13 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
       });
       setAudioStatus(prev => ({ ...prev, [index]: 'hidden' }));
     }
+    
+    setIsLoading(false);
+  };
+
+  const handleCategoryPress = (category: string) => {
+    setActiveCategory(category);
+    navigation.navigate('Category', { category });
   };
 
   const filteredCategories = categories.filter(cat =>
@@ -119,80 +159,175 @@ export default function SearchPage({ isDarkMode }: { isDarkMode: boolean }) {
   );
 
   return (
-    <Layout style={{ flex: 1 }} level="1">
-  <ScrollView
-    contentContainerStyle={{
-      padding: 16,
-    }}
-    >
-        <Layout style={styles.searchBarContainer}level="2"
->
-          <Ionicons name="search" size={24} color={isDarkMode ? '#ccc' : '#333'} style={styles.searchIcon} />
-          <Input
-             placeholder="Search for music..."
-             value={searchQuery}
-             onChangeText={setSearchQuery}
-             style={{ flex: 1 }}
-             placeholderTextColor={isDarkMode ? '#aaa' : '#666'}
-             status="basic"
-/>
-        </Layout>
-
-        {searchQuery.trim() !== '' ? (
-          <Layout>
-            <Text style={styles.sectionTitle}>Search Results</Text>
-            <Layout style={styles.resultsGrid}>
-              {filteredCategories.length > 0 ? (
-                filteredCategories.map(cat => {
-                  const index = categories.indexOf(cat);
-                  return (
-                    <CategoryCard
-                      key={cat}
-                      category={cat}
-                      index={index}
-                      image={categoryImages[index]}
-                      onPress={() => navigation.navigate('Category', { category: cat })}
-                    />
-                  );
-                })
-              ) : (
-                <Text appearance="hint" style={{ fontStyle: 'italic' }}>
-                  No matching categories found.
-                </Text>
-              )}
-            </Layout>
-          </Layout>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D9488" />
+      <View style={styles.container}>
+        {/* Big Logo Banner */}
+        <View style={styles.logoBanner}>
+          <Text style={styles.logoText}>PLAYSTREAM</Text>
+        </View>
+        
+        {/* Search Container */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons name="search" size={24} color="white" style={styles.searchIcon} />
+            <Input
+              placeholder="Find your music..."
+              placeholderTextColor="rgba(255,255,255,0.7)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInput}
+              size="large"
+              status="control"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={24} color="white" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        
+        {/* Category Chips */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryChipsContainer}
+          contentContainerStyle={styles.categoryChipsContent}
+        >
+          {categories.map((category) => (
+            <TouchableOpacity 
+              key={category}
+              onPress={() => handleCategoryPress(category)}
+              style={[
+                styles.categoryChip,
+                activeCategory === category && styles.categoryChipActive
+              ]}
+            >
+              <Text style={styles.categoryChipText}>{category}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>Loading amazing music...</Text>
+          </View>
         ) : (
-          <>
-            <Text style={styles.sectionTitle}>Trending Now</Text>
-            <Layout style={styles.trendingGrid}>
-              {trendingImages.map((image, index) => (
-                <TrendingCard
-                  key={index}
-                  image={image}
-                  index={index}
-                  onPress={() => handleAudioToggle(index)}
-                  isPlaying={audioStatus[index] === 'play'}
-                />
-              ))}
-            </Layout>
+          <Animated.ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }}
+          >
+            {searchQuery.trim() !== '' ? (
+              <View style={styles.resultsContainer}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Search Results</Text>
+                  <View style={styles.resultCountContainer}>
+                    <Text style={styles.resultCountText}>{filteredCategories.length}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.resultsGrid}>
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map(cat => {
+                      const index = categories.indexOf(cat);
+                      return (
+                        <CategoryCard
+                          key={cat}
+                          category={cat}
+                          index={index}
+                          image={categoryImages[index]}
+                          onPress={() => navigation.navigate('Category', { category: cat })}
+                        />
+                      );
+                    })
+                  ) : (
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="musical-notes" size={40} color="rgba(255,255,255,0.4)" />
+                      <Text style={styles.emptyText}>
+                        No matching categories found.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ) : (
+              <>
+                {/* Featured Track */}
+                <View style={styles.featuredContainer}>
+                  <Text style={styles.sectionTitle}>Featured</Text>
+                  <ImageBackground 
+                    source={trendingImages[0]}
+                    style={styles.featuredCard}
+                    imageStyle={styles.featuredCardImage}
+                  >
+                    <LinearGradient
+                      colors={['transparent', 'rgba(213,0,0,0.9)']}
+                      style={styles.featuredGradient}
+                    >
+                      <View style={styles.featuredContent}>
+                        <Text style={styles.featuredTitle}>Featured Track</Text>
+                        <Text style={styles.featuredArtist}>PlayStream Selection</Text>
+                        <TouchableOpacity 
+                          style={styles.featuredPlayButton}
+                          onPress={() => handleAudioToggle(0)}
+                        >
+                          <Ionicons 
+                            name={audioStatus[0] === 'play' ? 'pause' : 'play'} 
+                            size={24} 
+                            color="#0D9488" 
+                          />
+                          <Text style={styles.featuredPlayText}>
+                            {audioStatus[0] === 'play' ? 'PAUSE' : 'PLAY'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </LinearGradient>
+                  </ImageBackground>
+                </View>
 
-            <Text style={styles.sectionTitle}>All Categories</Text>
-            <Layout style={styles.categoriesList}>
-              {categories.map((cat, index) => (
-                <CategoryCard
-                  key={cat}
-                  category={cat}
-                  index={index}
-                  image={categoryImages[index]}
-                  onPress={() => navigation.navigate('Category', { category: cat })}
-                />
-              ))}
-            </Layout>
-          </>
+                {/* Trending Tracks */}
+                <View style={styles.trendingContainer}>
+                  <Text style={styles.sectionTitle}>Trending Now</Text>
+                  <View style={styles.trendingGrid}>
+                    {trendingImages.slice(1).map((image, index) => (
+                      <TrendingCard
+                        key={index + 1}
+                        image={image}
+                        index={index + 1}
+                        onPress={() => handleAudioToggle(index + 1)}
+                        isPlaying={audioStatus[index + 1] === 'play'}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Genres Grid */}
+                <View style={styles.genresContainer}>
+                  <Text style={styles.sectionTitle}>Explore Genres</Text>
+                  <View style={styles.categoriesList}>
+                    {categories.map((cat, index) => (
+                      <CategoryCard
+                        key={cat}
+                        category={cat}
+                        index={index}
+                        image={categoryImages[index]}
+                        onPress={() => navigation.navigate('Category', { category: cat })}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </>
+            )}
+          </Animated.ScrollView>
         )}
-      </ScrollView>
-    </Layout>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -204,14 +339,32 @@ function TrendingCard({ image, index, onPress, isPlaying }: TrendingCardProps) {
       onPressIn={() => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start()}
       onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
       onPress={onPress}
-      style={{ transform: [{ scale }], marginBottom: 16 }}
+      style={[
+        { transform: [{ scale }] },
+        styles.trackCardTouchable
+      ]}
     >
-      <Layout style={styles.trendingItemContainer}>
-        <Image source={image} style={styles.trendingImage} />
-        <Layout style={styles.trendingIconOverlay}>
-          <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle'} size={36} color="#FF9800" />
-        </Layout>
-      </Layout>
+      <LinearGradient
+        colors={['#1F2937', '#111827']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 0}}
+        style={styles.trackItemContainer}
+      >
+        <Image source={image} style={styles.trackImage} />
+        <View style={styles.trackTextContainer}>
+          <Text style={styles.trackTitle} numberOfLines={1}>Trending Track {index}</Text>
+          <Text style={styles.trackArtist} numberOfLines={1}>PlayStream Artist</Text>
+        </View>
+        <View style={styles.trackIconContainer}>
+          <View style={[styles.playButton, isPlaying ? styles.playButtonActive : null]}>
+            <Ionicons 
+              name={isPlaying ? 'pause' : 'play'} 
+              size={20} 
+              color="#fff" 
+            />
+          </View>
+        </View>
+      </LinearGradient>
     </AnimatedTouchable>
   );
 }
@@ -224,93 +377,300 @@ function CategoryCard({ category, image, index, onPress }: CategoryCardProps) {
       onPressIn={() => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true }).start()}
       onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
       onPress={onPress}
-      style={{ transform: [{ scale }], marginBottom: 16 }}
+      style={[
+        { transform: [{ scale }] },
+        styles.categoryCardTouchable
+      ]}
     >
       <LinearGradient
-        colors={gradientColors[index % gradientColors.length]}
+        colors={tealGradients[index % tealGradients.length]}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 0}}
         style={styles.categoryCard}
       >
         <Image source={image} style={styles.categoryCardImage} />
-        <Text style={styles.categoryCardText}>{category}</Text>
+        <View style={styles.categoryOverlay}>
+          <Text style={styles.categoryCardText}>{category}</Text>
+        </View>
       </LinearGradient>
     </AnimatedTouchable>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#111827',
+  },
   container: {
-    flexGrow: 1,
+    flex: 1,
+    backgroundColor: '#111827',
+  },
+  logoBanner: {
+    backgroundColor: '#0D9488',
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: 'bold',
+    letterSpacing: 3,
+  },
+  searchContainer: {
+    backgroundColor: '#0D9488',
+    padding: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 30,
+    padding: 5,
+  },
+  searchIcon: {
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    color: 'white',
+  },
+  clearButton: {
+    padding: 8,
+  },
+  categoryChipsContainer: {
+    maxHeight: 50,
+    backgroundColor: '#121212',
+  },
+  categoryChipsContent: {
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  searchBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 20,
   },
-  searchIcon: { marginRight: 8 },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  categoryChipActive: {
+    backgroundColor: '#0D9488',
+  },
+  categoryChipText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  scrollContainer: {
+    padding: 16,
+  },
+  resultsContainer: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginVertical: 12,
-    color: "#0D9488",
+    color: '#0D9488',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  resultCountContainer: {
+    backgroundColor: '#0D9488',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  resultCountText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  featuredContainer: {
+    marginBottom: 24,
+  },
+  featuredCard: {
+    height: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 12,
+  },
+  featuredCardImage: {
+    borderRadius: 16,
+  },
+  featuredGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  featuredContent: {
+    padding: 16,
+  },
+  featuredTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  featuredArtist: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  featuredPlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    alignSelf: 'flex-start',
+  },
+  featuredPlayText: {
+    color: '#0D9488',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  trendingContainer: {
+    marginBottom: 24,
+  },
+  genresContainer: {
+    marginBottom: 24,
   },
   trendingGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  trendingItemContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
+  resultsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  trackCardTouchable: {
+    width: deviceWidth / 2 - 24,
+    marginBottom: 12,
+  },
+  trackItemContainer: {
+    flexDirection: 'column',
+    padding: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 180,
+  },
+  trackImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  trackTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  trackTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: 'white',
+  },
+  trackArtist: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  trackIconContainer: {
+    position: 'absolute',
+    top: 76,
+    right: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: 40, 
+    height: 40,
     borderRadius: 20,
-    backgroundColor: "#333",
+    backgroundColor: '#0D9488',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  trendingImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
+  playButtonActive: {
+    backgroundColor: '#FF9800',
   },
-  trendingIconOverlay: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
+  emptyContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 12,
   },
   categoriesList: {
-    flexDirection: "column",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  categoryCardTouchable: {
+    width: deviceWidth / 2 - 24,
+    marginBottom: 16,
   },
   categoryCard: {
-    width: "98%",
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 20,
+    height: 120,
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
   },
   categoryCardImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: 16,
+    width: '100%',
+    height: '100%',
+    opacity: 0.6,
+  },
+  categoryOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   categoryCardText: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  searchResults: { marginBottom: 30 },
-  resultsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
