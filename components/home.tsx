@@ -10,6 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { fetchPlaylistTracks, fetchPopularTrack, Track } from '../services/musicService';
+import { Animated, Easing } from 'react-native';
+
+
 
 interface HomePageProps {
   setActiveTab?: (tab: string) => void;
@@ -160,6 +163,32 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
     setProfileModalVisible(false);
   };
 
+  //vinyl record
+  const vinylAnim = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+  
+    if (isPlaying) {
+      animation = Animated.loop(
+        Animated.timing(vinylAnim, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+      animation.start();
+    } else {
+      vinylAnim.stopAnimation();
+    }
+  
+    return () => {
+      animation?.stop();
+    };
+  }, [isPlaying]);
+  
+
   return (
     <Layout style={{ flex: 1 }} level="1">
       {/* HEADER */}
@@ -177,6 +206,22 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
 
       {/* MUSIC PLAYER */}
       <Layout style={[styles.musicPlayer, { backgroundColor: musicPlayerBg }]}>
+        <Animated.Image
+          source={require('../assets/vinyl.png')}
+          style={[
+            styles.vinyl,
+            {
+              transform: [
+                {
+                  rotate: vinylAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
         <Text style={styles.nowPlayingText}>
           {currentTrack ? currentTrack.name : 'Press Play to Load Track'}
         </Text>
@@ -203,10 +248,13 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
           </TouchableOpacity>
         </Layout>
       </Layout>
+  
+    
+        {/* LOADING INDICATOR */}
 
       {/* PLAYLISTS */}
       <Layout style={styles.playlistsContainer}>
-        <Text style={styles.sectionTitle}>My Playlists</Text>
+        <Text style={styles.sectionTitle}>Pick a Genre: </Text>
         <ScrollView contentContainerStyle={styles.playlistsGrid}>
           {playlists.map((playlist) => (
             <TouchableOpacity
@@ -307,6 +355,7 @@ const styles = StyleSheet.create({
     padding: 30,
     marginHorizontal: 20,
     marginTop: 25,
+    marginBottom: 20,
     borderRadius: 12,
   },
   controls: {
@@ -420,4 +469,12 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#75918E',
   },
+
+  vinyl: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    marginBottom: 16,
+  },
+  
 });
