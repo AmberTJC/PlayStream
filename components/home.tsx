@@ -10,8 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { fetchPlaylistTracks, fetchPopularTrack, Track } from '../services/musicService';
+import { useRef } from 'react';
 import { Animated, Easing } from 'react-native';
-
 
 
 interface HomePageProps {
@@ -20,12 +20,12 @@ interface HomePageProps {
 }
 
 const playlists = [
-  { name: 'Favourites', image: require('../assets/home-images/favs.jpg') },
+  { name: 'Top 100', image: require('../assets/home-images/favs.jpg') },
   { name: 'Chill Vibes', image: require('../assets/home-images/chill vibes.png') },
   { name: 'Pop Hits', image: require('../assets/home-images/acoustics.jpg') },
   { name: 'Oldies', image: require('../assets/home-images/Billy Joel.jpg') },
   { name: 'Party Music', image: require('../assets/home-images/party music.jpg') },
-  { name: 'Country Vibes', image: require('../assets/home-images/country vibes.jpg') },
+  { name: 'Country', image: require('../assets/home-images/country vibes.jpg') },
 ];
 
 export default function HomePage({ isDarkMode }: HomePageProps) {
@@ -62,12 +62,18 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
 
   const playTrack = async (track: Track) => {
     try {
+      if (!track.audio || !track.audio.startsWith('http')) {
+        return;
+      }
+  
       if (sound) await sound.unloadAsync();
+  
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: track.audio },
         { shouldPlay: true },
         onPlaybackStatusUpdate
       );
+  
       setCurrentTrack(track);
       setSound(newSound);
       setIsPlaying(true);
@@ -76,6 +82,7 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
       Alert.alert("Playback error", "Unable to play selected track.");
     }
   };
+  
 
   const onPlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
@@ -164,13 +171,14 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
   };
 
   //vinyl record
-  const vinylAnim = useState(new Animated.Value(0))[0];
-
-  useEffect(() => {
-    let animation: Animated.CompositeAnimation | null = null;
+  const vinylAnim = useRef(new Animated.Value(0)).current;
+  const vinylAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
   
+  useEffect(() => {
     if (isPlaying) {
-      animation = Animated.loop(
+      vinylAnim.setValue(0); 
+  
+      vinylAnimationRef.current = Animated.loop(
         Animated.timing(vinylAnim, {
           toValue: 1,
           duration: 4000,
@@ -178,15 +186,21 @@ export default function HomePage({ isDarkMode }: HomePageProps) {
           useNativeDriver: true,
         })
       );
-      animation.start();
+  
+      vinylAnimationRef.current.start();
     } else {
-      vinylAnim.stopAnimation();
+      vinylAnimationRef.current?.stop();
     }
   
     return () => {
-      animation?.stop();
+      vinylAnimationRef.current?.stop();
     };
   }, [isPlaying]);
+  
+  const rotate = vinylAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
   
 
   return (
@@ -352,21 +366,23 @@ const styles = StyleSheet.create({
   musicPlayer: {
     alignItems: 'center',
     backgroundColor: '#1F2937',
-    padding: 30,
+    padding: 10,
     marginHorizontal: 20,
-    marginTop: 25,
-    marginBottom: 20,
+    marginTop: 13,
+    marginBottom: 13,
     borderRadius: 12,
   },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 5,
+    padding: 5,
+    borderRadius: 10,
   },
   playButton: {
     backgroundColor: '#0D9488',
-    width: 60,
-    height: 60,
+    width: 55,
+    height: 55,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
@@ -378,7 +394,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#0D9488',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
     marginBottom: 12,
   },
