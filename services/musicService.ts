@@ -57,22 +57,26 @@ export const fetchPopularTrack = async (): Promise<Track | null> => {
     }
     
     // Otherwise, fetch a batch of tracks from Deezer chart
-    const response = await fetch(`${DEEZER_API_BASE}/chart/0/tracks?limit=10`);
+    console.log("Fetching 30 popular tracks from Deezer chart");
+    const response = await fetch(`${DEEZER_API_BASE}/chart/0/tracks?limit=30`);
     const data = await response.json();
     
     if (data.data && data.data.length > 0) {
       // Store tracks in cache
       tracksCache = data.data.map(convertDeezerTrack);
+      console.log(`Retrieved ${tracksCache.length} popular tracks`);
       currentTrackIndex = 0;
       return tracksCache[0];
     }
     
     // If we still failed, try a different endpoint
-    const randomSearch = await fetch(`${DEEZER_API_BASE}/search?q=pop&limit=10`);
+    console.log("Falling back to search endpoint for popular tracks");
+    const randomSearch = await fetch(`${DEEZER_API_BASE}/search?q=pop&limit=30`);
     const randomData = await randomSearch.json();
     
     if (randomData.data && randomData.data.length > 0) {
       tracksCache = randomData.data.map(convertDeezerTrack);
+      console.log(`Retrieved ${tracksCache.length} tracks from fallback search`);
       currentTrackIndex = 0;
       return tracksCache[0];
     }
@@ -87,31 +91,59 @@ export const fetchPopularTrack = async (): Promise<Track | null> => {
 /**
  * Search for tracks by query term using Deezer
  * @param query The search term
- * @param limit Number of results to return (default: 10)
+ * @param limit Number of results to return (default: 10, max: 100)
  * @returns Array of tracks if successful
  */
 export const searchTracks = async (query: string, limit: number = 10): Promise<Track[]> => {
   try {
-    const response = await fetch(
-      `${DEEZER_API_BASE}/search?q=${encodeURIComponent(query)}&limit=${limit}`
-    );
-    const data = await response.json();
+    console.log(`Searching for "${query}" with limit ${limit}`);
     
-    if (data.data && data.data.length > 0) {
-      // Add search results to cache as well for more variety
-      const newTracks = data.data.map(convertDeezerTrack);
+    // Ensure limit is valid
+    const validLimit = Math.min(Math.max(1, limit), 100);
+    
+    // For larger result sets, we need to make multiple requests
+    const batchSize = 25; // Deezer API limitation for single calls
+    const batches = Math.ceil(validLimit / batchSize);
+    let allResults: Track[] = [];
+    
+    for (let i = 0; i < batches && allResults.length < validLimit; i++) {
+      const index = i * batchSize;
+      const response = await fetch(
+        `${DEEZER_API_BASE}/search?q=${encodeURIComponent(query)}&limit=${batchSize}&index=${index}`
+      );
+      const data = await response.json();
       
+      if (data.data && data.data.length > 0) {
+        const batchResults = data.data.map(convertDeezerTrack);
+        allResults = [...allResults, ...batchResults];
+      } else {
+        break; // No more results available
+      }
+    }
+    
+    // Limit to requested number and deduplicate
+    const trackIds = new Set();
+    allResults = allResults.filter(track => {
+      if (trackIds.has(track.id)) return false;
+      trackIds.add(track.id);
+      return true;
+    }).slice(0, validLimit);
+    
+    console.log(`Retrieved ${allResults.length} unique tracks for search: "${query}"`);
+    
+    // Add search results to cache as well for more variety
+    if (allResults.length > 0) {
       // Update cache with new unique tracks (prevent duplicates)
       const existingIds = new Set(tracksCache.map(t => t.id));
-      const uniqueNewTracks = newTracks.filter((t: Track) => !existingIds.has(t.id));
+      const uniqueNewTracks = allResults.filter((t: Track) => !existingIds.has(t.id));
       
       if (uniqueNewTracks.length > 0) {
+        console.log(`Adding ${uniqueNewTracks.length} new unique tracks to cache`);
         tracksCache = [...tracksCache, ...uniqueNewTracks];
       }
-      
-      return newTracks;
     }
-    return [];
+    
+    return allResults;
   } catch (error) {
     console.error("Error searching tracks:", error);
     return [];
@@ -119,13 +151,18 @@ export const searchTracks = async (query: string, limit: number = 10): Promise<T
 };
 
 /**
- * Fetches tracks from a specific genre using Deezer
- * @param genre The genre to fetch (e.g. 'rock', 'pop', 'jazz')
- * @param limit Number of results to return (default: 10)
+ * Fetches tracks from a specific genre
+ * @param genre The genre name to search for
+ * @param limit Number of results to return (default: 10, max: 100)
  * @returns Array of tracks if successful
  */
 export const fetchTracksByGenre = async (genre: string, limit: number = 10): Promise<Track[]> => {
   try {
+    console.log(`Fetching ${limit} tracks for genre '${genre}'`);
+    
+    // Ensure limit is valid
+    const validLimit = Math.min(Math.max(1, limit), 100);
+    
     // First try to get genre ID
     const genreResponse = await fetch(`${DEEZER_API_BASE}/genre`);
     const genreData = await genreResponse.json();
@@ -145,102 +182,181 @@ export const fetchTracksByGenre = async (genre: string, limit: number = 10): Pro
     
     // If we found a genre ID, get artists from that genre
     if (genreId > 0) {
-      const artistsResponse = await fetch(`${DEEZER_API_BASE}/genre/${genreId}/artists`);
+      // Get more artists to increase variety
+      const artistsResponse = await fetch(`${DEEZER_API_BASE}/genre/${genreId}/artists?limit=10`);
       const artistsData = await artistsResponse.json();
       
       if (artistsData.data && artistsData.data.length > 0) {
-        // Get tracks from the first artist
-        const artistId = artistsData.data[0].id;
-        const tracksResponse = await fetch(`${DEEZER_API_BASE}/artist/${artistId}/top?limit=${limit}`);
-        const tracksData = await tracksResponse.json();
+        const tracksPromises = artistsData.data.slice(0, 5).map(async (artist: any) => {
+          try {
+            const tracksPerArtist = Math.ceil(validLimit / 5);
+            const tracksResponse = await fetch(`${DEEZER_API_BASE}/artist/${artist.id}/top?limit=${tracksPerArtist}`);
+            const tracksData = await tracksResponse.json();
+            
+            if (tracksData.data && tracksData.data.length > 0) {
+              return tracksData.data.map(convertDeezerTrack);
+            }
+            return [];
+          } catch (error) {
+            console.error(`Error fetching tracks for artist ${artist.id}:`, error);
+            return [];
+          }
+        });
         
-        if (tracksData.data && tracksData.data.length > 0) {
-          const newTracks = tracksData.data.map(convertDeezerTrack);
+        const tracksArrays = await Promise.all(tracksPromises);
+        let allTracks = tracksArrays.flat();
+        
+        // Deduplicate tracks by ID
+        const trackIds = new Set();
+        allTracks = allTracks.filter(track => {
+          if (trackIds.has(track.id)) return false;
+          trackIds.add(track.id);
+          return true;
+        });
+        
+        // Limit to requested number
+        const results = allTracks.slice(0, validLimit);
+        
+        if (results.length > 0) {
+          console.log(`Retrieved ${results.length} tracks for genre ${genre} from multiple artists`);
           
           // Add to cache for more variety
           const existingIds = new Set(tracksCache.map(t => t.id));
-          const uniqueNewTracks = newTracks.filter((t: Track) => !existingIds.has(t.id));
+          const uniqueNewTracks = results.filter((t: Track) => !existingIds.has(t.id));
           
           if (uniqueNewTracks.length > 0) {
             tracksCache = [...tracksCache, ...uniqueNewTracks];
           }
           
-          return newTracks;
+          return results;
         }
       }
     }
     
     // Fallback: search for tracks with the genre name
-    return searchTracks(genre, limit);
+    console.log(`Falling back to search for genre: ${genre}`);
+    return searchTracks(genre, validLimit);
   } catch (error) {
     console.error(`Error fetching ${genre} tracks:`, error);
     // Fallback to general search
-    return searchTracks(genre, limit);
+    return searchTracks(genre, Math.min(limit, 30)); // Limit fallback search to avoid too many requests
   }
 };
 
 /**
  * Fetches tracks from Deezer playlists
  * @param playlistName The name/keyword of the playlist to search for
- * @param limit Number of results to return (default: 10)
+ * @param limit Number of results to return (default: 10, max: 100)
  * @returns Array of tracks if successful
  */
 export const fetchPlaylistTracks = async (playlistName: string, limit: number = 10): Promise<Track[]> => {
   try {
+    console.log(`Fetching playlist tracks for "${playlistName}" with limit ${limit}`);
+    
+    // Ensure limit is valid
+    const validLimit = Math.min(Math.max(1, limit), 100);
+    
     // Search for playlists matching the name
     const playlistResponse = await fetch(
-      `${DEEZER_API_BASE}/search/playlist?q=${encodeURIComponent(playlistName)}&limit=1`
+      `${DEEZER_API_BASE}/search/playlist?q=${encodeURIComponent(playlistName)}&limit=3`
     );
     const playlistData = await playlistResponse.json();
     
+    let allTracks: Track[] = [];
+    
     if (playlistData.data && playlistData.data.length > 0) {
-      const playlistId = playlistData.data[0].id;
+      // Try up to 3 different playlists to get more variety
+      const playlistPromises = playlistData.data.slice(0, 3).map(async (playlist: any) => {
+        try {
+          const tracksPerPlaylist = Math.ceil(validLimit / 3);
+          
+          // For larger result sets, we need to make multiple requests
+          const batchSize = 25; // Deezer API limitation for single calls
+          const batches = Math.ceil(tracksPerPlaylist / batchSize);
+          let playlistTracks: Track[] = [];
+          
+          for (let i = 0; i < batches && playlistTracks.length < tracksPerPlaylist; i++) {
+            const index = i * batchSize;
+            const tracksResponse = await fetch(
+              `${DEEZER_API_BASE}/playlist/${playlist.id}/tracks?limit=${batchSize}&index=${index}`
+            );
+            const tracksData = await tracksResponse.json();
+            
+            if (tracksData.data && tracksData.data.length > 0) {
+              const batchResults = tracksData.data.map(convertDeezerTrack);
+              playlistTracks = [...playlistTracks, ...batchResults];
+            } else {
+              break; // No more tracks in this playlist
+            }
+          }
+          
+          return playlistTracks.slice(0, tracksPerPlaylist);
+        } catch (error) {
+          console.error(`Error fetching tracks for playlist ${playlist.id}:`, error);
+          return [];
+        }
+      });
       
-      // Get tracks from the playlist
-      const tracksResponse = await fetch(`${DEEZER_API_BASE}/playlist/${playlistId}/tracks?limit=${limit}`);
-      const tracksData = await tracksResponse.json();
+      const tracksArrays = await Promise.all(playlistPromises);
+      allTracks = tracksArrays.flat();
       
-      if (tracksData.data && tracksData.data.length > 0) {
-        const newTracks = tracksData.data.map(convertDeezerTrack);
+      // Deduplicate tracks by ID
+      const trackIds = new Set();
+      allTracks = allTracks.filter(track => {
+        if (trackIds.has(track.id)) return false;
+        trackIds.add(track.id);
+        return true;
+      }).slice(0, validLimit);
+      
+      if (allTracks.length > 0) {
+        console.log(`Retrieved ${allTracks.length} tracks for playlist "${playlistName}"`);
         
         // Add to cache for more variety
         const existingIds = new Set(tracksCache.map(t => t.id));
-        const uniqueNewTracks = newTracks.filter((t: Track) => !existingIds.has(t.id));
+        const uniqueNewTracks = allTracks.filter((t: Track) => !existingIds.has(t.id));
         
         if (uniqueNewTracks.length > 0) {
+          console.log(`Adding ${uniqueNewTracks.length} new unique tracks to cache`);
           tracksCache = [...tracksCache, ...uniqueNewTracks];
         }
         
-        return newTracks;
+        return allTracks;
       }
     }
     
     // Fallback: just search for tracks with the playlist name as keyword
-    return searchTracks(playlistName, limit);
+    console.log(`Falling back to search for playlist: ${playlistName}`);
+    return searchTracks(playlistName, validLimit);
   } catch (error) {
     console.error(`Error fetching ${playlistName} playlist:`, error);
-    return searchTracks(playlistName, limit);
+    return searchTracks(playlistName, Math.min(limit, 30)); // Limit fallback search
   }
 };
 
 /**
  * Force fetch new tracks to replace the current cache
  * @param genre Optional genre to specify what kind of tracks to get
+ * @param limit Number of tracks to fetch (default: 100)
  * @returns Array of new tracks
  */
-export const refreshTracks = async (genre?: string): Promise<Track[]> => {
+export const refreshTracks = async (genre?: string, limit: number = 100): Promise<Track[]> => {
   try {
+    console.log(`Refreshing tracks cache with limit: ${limit}`);
     // Clear existing cache
     tracksCache = [];
     currentTrackIndex = 0;
     
+    // Ensure limit is valid
+    const validLimit = Math.min(Math.max(1, limit), 100);
+    
     if (genre) {
-      return await fetchTracksByGenre(genre, 20);
+      return await fetchTracksByGenre(genre, validLimit);
     } else {
-      const response = await fetch(`${DEEZER_API_BASE}/chart/0/tracks?limit=20`);
+      const response = await fetch(`${DEEZER_API_BASE}/chart/0/tracks?limit=${validLimit}`);
       const data = await response.json();
       
       if (data.data && data.data.length > 0) {
+        console.log(`Retrieved ${data.data.length} tracks from chart`);
         tracksCache = data.data.map(convertDeezerTrack);
         return tracksCache;
       }
