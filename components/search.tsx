@@ -203,34 +203,6 @@ export default function SearchPage() {
           </View>
         </View>
         
-        {/* Category Chips - Horizontal Scroll */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[styles.categoryChipsContainer, { backgroundColor: isDarkMode ? '#121212' : '#e0e0e0' }]}
-          contentContainerStyle={styles.categoryChipsContent}
-        >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.categoryChip,
-                activeCategory === cat && styles.activeChip,
-                { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-              ]}
-              onPress={() => handleCategoryPress(cat)}
-            >
-              <Text style={[
-                styles.categoryChipText,
-                activeCategory === cat && styles.activeChipText,
-                { color: isDarkMode ? '#fff' : '#333' }
-              ]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0D9488" />
